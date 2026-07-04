@@ -1,1 +1,10 @@
 venv
+.env
+
+blue_prints_
+
+data/
+
+__pycache__/
+
+*.egg-info/
