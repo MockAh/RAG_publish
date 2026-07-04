@@ -3,7 +3,7 @@
 > Compañero del plan de implementación. Recoge todo lo que decidimos **anotar
 > en vez de resolver ahora**: hallazgos durante la construcción, deuda técnica
 > aceptada, y verificaciones que se posponen a T13 o a fases posteriores.
-> Estado: vivo · actualizar al cerrar cada tarea. Corte actual: **T5 firmado, T6 en curso**.
+> Estado: vivo · actualizar al cerrar cada tarea. Corte actual: **T6 firmado, T7 en curso**.
 
 ---
 
@@ -30,6 +30,26 @@ aunque el cuerpo sea español. El corpus mezclará idiomas **dentro del mismo re
 **Estatus:** no es problema — es la justificación empírica del modelo multilingüe.
 El test slow de T7 puede verificar que tema-es ↔ abstract-en quedan cercanos en el
 espacio vectorial. Refuerza la decisión A6 del plan (e5 multilingüe), no la contradice.
+
+### A3 · El umbral default 0.35 está en una escala que no corresponde a la de e5
+**Descubierto en:** análisis previo a T7 (al juntar la mecánica de scoring del plan con
+el default de config).
+**Qué:** e5 produce vectores normalizados; el coseno crudo entre dos textos cae en un rango
+**estrecho y alto**, típicamente ~0.6–1.0 (rara vez por debajo de 0.6, incluso para textos
+no relacionados). El default `relevance_threshold = 0.35` (config, T0) está *por debajo de
+ese piso*: con ese valor, el filtro no descartaría prácticamente nada — ni un paper de
+química orgánica frente a un tema de filosofía.
+**Causa probable:** el 0.35 parece pensado para una escala distinta (p. ej. coseno
+re-mapeado a [0,1], o distancia, o un modelo no normalizado). No es bug de código:
+el scoring en escala cruda es correcto (así lo pide el plan); es el *parámetro* el que
+está en la moneda equivocada.
+**Qué esperar:** el umbral final probablemente viva en **~0.75–0.85**, no cerca de 0.35.
+El valor exacto sale de T13 con la tabla de descartados (D1). El test slow de T7 dará la
+**primera evidencia empírica**: los dos scores que imprima (abstract on-topic vs.
+off-topic) acotan por dónde anda la frontera real.
+**Acción:** no cambiar el default en config todavía — se ajusta con datos en T13. Solo
+tener presente que un umbral bajo en las primeras corridas de prueba dejará pasar ruido,
+y eso es esperado, no un fallo.
 
 ---
 
@@ -83,10 +103,12 @@ debe colapsar a un solo registro. Para *dedup* esto es la conducta deseada.
 ## D · Verificaciones y calibraciones pospuestas a T13 (corrida real)
 
 ### D1 · Umbral de relevancia — calibración con evidencia
-**Default:** 0.35 (config). **Pendiente:** revisar `papers_discarded` con score en [0.25, umbral].
-Si hay falsos descartes relevantes → bajar. Si en aceptados hay ruido (papers que solo citan
-a Echeverría de pasada) → subir. En tema-autor probablemente suba. **Documentar valor final.**
-Criterio de aceptación 6 del plan.
+**Default:** 0.35 (config) — pero ver **A3**: ese 0.35 está en una escala que no corresponde
+a la de e5; el valor real probablemente viva en ~0.75–0.85. **Pendiente:** revisar
+`papers_discarded` alrededor del umbral que salga del test slow de T7. Si hay falsos descartes
+relevantes → bajar. Si en aceptados hay ruido (papers que solo citan a Echeverría de pasada)
+→ subir. En tema-autor probablemente el filtro deba ser exigente. **Documentar valor final y
+actualizar el default en config una vez calibrado.** Criterio de aceptación 6 del plan.
 
 ### D2 · Criterio de PDFs recalibrado a ≥ 40 %
 **Origen:** decisión A8. El 60 % original es para STEM (cobertura arXiv). Humanidades en
@@ -154,8 +176,8 @@ Los contratos viven en `docs/01-CONTRATOS-DE-DATOS_v11.md` (con sufijo `_v11`) y
 | T3 · ApiClient base | ✅ firmado | sí |
 | T4 · Cliente OpenAlex | ✅ firmado | sí |
 | T5 · Normalización | ✅ firmado | sí |
-| T6 · Dedup | 🔄 en curso | — |
-| T7 · Relevancia (e5) | ⏳ pendiente | — |
+| T6 · Dedup | ✅ firmado | sí |
+| T7 · Relevancia (e5) | 🔄 en curso | — |
 | T8 · Crossref + S2 | ⏳ pendiente | — |
 | T9 · Snowball | ⏳ pendiente | — |
 | T10 · Descarga PDFs | ⏳ pendiente | — |

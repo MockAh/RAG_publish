@@ -24,3 +24,8 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["excavador"]
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: usa el modelo real de embeddings",
+]
