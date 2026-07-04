@@ -1,0 +1,25 @@
+{
+  "meta": {
+    "count": 3,
+    "db_response_time_ms": 9,
+    "page": null,
+    "per_page": 200,
+    "next_cursor": null
+  },
+  "results": [
+    {
+      "id": "https://openalex.org/W3000000001",
+      "doi": null,
+      "title": "Tercer resultado, ya en la segunda página",
+      "display_name": "Tercer resultado, ya en la segunda página",
+      "publication_year": 2020,
+      "type": "book-chapter",
+      "authorships": [],
+      "primary_location": null,
+      "abstract_inverted_index": null,
+      "referenced_works": [],
+      "open_access": {"is_oa": false, "oa_url": null},
+      "best_oa_location": null
+    }
+  ]
+}

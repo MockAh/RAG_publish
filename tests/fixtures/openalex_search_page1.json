@@ -1,0 +1,50 @@
+{
+  "meta": {
+    "count": 3,
+    "db_response_time_ms": 12,
+    "page": null,
+    "per_page": 200,
+    "next_cursor": "IlsxNjA5NDU5NzQ0MDAwLCAnVzI3NDE4MDk4MDcnXSI="
+  },
+  "results": [
+    {
+      "id": "https://openalex.org/W2741809807",
+      "doi": "https://doi.org/10.7717/peerj.4375",
+      "title": "The state of OA: a large-scale analysis of the prevalence and impact of Open Access articles",
+      "display_name": "The state of OA: a large-scale analysis of the prevalence and impact of Open Access articles",
+      "publication_year": 2018,
+      "type": "article",
+      "authorships": [
+        {"author": {"display_name": "Heather Piwowar"}, "raw_affiliation_strings": []}
+      ],
+      "primary_location": {
+        "source": {"display_name": "PeerJ"}
+      },
+      "abstract_inverted_index": {
+        "Despite": [0],
+        "growing": [1],
+        "interest": [2],
+        "in": [3, 6],
+        "Open": [4],
+        "Access": [5]
+      },
+      "referenced_works": ["https://openalex.org/W2100"],
+      "open_access": {"is_oa": true, "oa_url": "https://peerj.com/articles/4375.pdf"},
+      "best_oa_location": {"pdf_url": "https://peerj.com/articles/4375.pdf"}
+    },
+    {
+      "id": "https://openalex.org/W2963341561",
+      "doi": "https://doi.org/10.1000/example.001",
+      "title": "Segundo resultado de la primera página",
+      "display_name": "Segundo resultado de la primera página",
+      "publication_year": 2019,
+      "type": "article",
+      "authorships": [],
+      "primary_location": {"source": {"display_name": "Revista de Ejemplo"}},
+      "abstract_inverted_index": null,
+      "referenced_works": [],
+      "open_access": {"is_oa": false, "oa_url": null},
+      "best_oa_location": null
+    }
+  ]
+}
