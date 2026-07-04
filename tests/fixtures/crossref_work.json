@@ -1,0 +1,12 @@
+{
+  "DOI": "10.1016/j.example.2020.01.001",
+  "type": "journal-article",
+  "title": ["La filosofía de la cultura en Bolívar Echeverría"],
+  "author": [
+    {"given": "Ana", "family": "Pérez"},
+    {"given": "Luis", "family": "Gómez"}
+  ],
+  "issued": {"date-parts": [[2020, 3, 1]]},
+  "container-title": ["Revista de Estudios Latinoamericanos"],
+  "abstract": "<jats:p>Este artículo analiza <jats:italic>la obra</jats:italic> de Bolívar Echeverría.</jats:p>"
+}

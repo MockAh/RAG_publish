@@ -1,0 +1,11 @@
+{
+  "paperId": "abc123",
+  "externalIds": {"DOI": "10.1000/s2.example"},
+  "title": "Modernidad barroca y valor de uso",
+  "abstract": "Un análisis del concepto de modernidad barroca.",
+  "year": 2015,
+  "venue": "Latin American Perspectives",
+  "authors": [{"authorId": "1", "name": "Carlos Ruiz"}],
+  "references": [{"paperId": "ref1"}, {"paperId": "ref2"}],
+  "publicationTypes": ["JournalArticle"]
+}
