@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arquitectura · Sistema multiagente de investigación y escritura científica</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=STIX+Two+Text:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1b1b1b;
+    --ink-soft:#565656;
+    --paper:#ffffff;
+    --desk:#e9e8e4;
+    --rule:#c9c7c1;
+    --arxiv:#b31b1b;      /* flujo online (consulta) */
+    --hyperref:#0b4f9e;   /* flujo offline (ingesta) */
+    --serif:"STIX Two Text", Georgia, "Times New Roman", serif;
+    --mono:"IBM Plex Mono", "SF Mono", Consolas, monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--desk);
+    font-family:var(--serif);
+    color:var(--ink);
+    padding:32px 12px 64px;
+    line-height:1.55;
+  }
+  .sheet{
+    max-width:920px;
+    margin:0 auto;
+    background:var(--paper);
+    border-top:5px solid var(--arxiv);
+    box-shadow:0 1px 3px rgba(0,0,0,.12), 0 12px 32px rgba(0,0,0,.10);
+    padding:40px 48px 56px;
+  }
+  .masthead{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.06em;
+    color:var(--ink-soft);
+    border-bottom:1px solid var(--rule);
+    padding-bottom:10px;
+    margin-bottom:34px;
+  }
+  .masthead .id{color:var(--arxiv)}
+  h1{
+    font-size:27px;
+    font-weight:700;
+    line-height:1.25;
+    text-align:center;
+    max-width:640px;
+    margin:0 auto 10px;
+  }
+  .subtitle{
+    text-align:center;
+    font-style:italic;
+    color:var(--ink-soft);
+    font-size:15.5px;
+    margin-bottom:30px;
+  }
+  .abstract{
+    max-width:640px;
+    margin:0 auto 40px;
+    font-size:14px;
+    border-top:1px solid var(--rule);
+    border-bottom:1px solid var(--rule);
+    padding:14px 4px;
+  }
+  .abstract b{font-variant:small-caps;letter-spacing:.04em;font-weight:600}
+  figure{margin:0 0 8px}
+  .fig-frame{
+    border:1px solid var(--rule);
+    padding:18px 10px 10px;
+    overflow-x:auto;
+  }
+  svg{display:block;width:100%;height:auto;min-width:640px}
+  figcaption{
+    font-size:13px;
+    color:var(--ink);
+    max-width:720px;
+    margin:14px auto 0;
+    text-align:justify;
+  }
+  figcaption .figno{font-weight:700}
+  section{margin-top:40px}
+  h2{
+    font-size:15px;
+    font-variant:small-caps;
+    letter-spacing:.05em;
+    font-weight:700;
+    margin-bottom:12px;
+  }
+  h2 .num{color:var(--arxiv);font-variant:normal;font-family:var(--mono);font-size:12px;margin-right:8px}
+  .cols{
+    columns:2;
+    column-gap:36px;
+    font-size:13.5px;
+    text-align:justify;
+    hyphens:auto;
+  }
+  .cols p{margin-bottom:10px;break-inside:avoid}
+  .cols dfn{font-style:normal;font-weight:600}
+  .delta{
+    margin-top:36px;
+    background:#faf7f2;
+    border:1px solid var(--rule);
+    border-left:3px solid var(--hyperref);
+    padding:16px 20px;
+    font-size:13.5px;
+  }
+  .delta h2{margin-bottom:8px}
+  .delta p{margin-bottom:8px}
+  .delta p:last-child{margin-bottom:0}
+  footer{
+    margin-top:44px;
+    padding-top:12px;
+    border-top:1px solid var(--rule);
+    font-family:var(--mono);
+    font-size:10.5px;
+    color:var(--ink-soft);
+    display:flex;
+    justify-content:space-between;
+  }
+  /* — tipografía dentro del SVG — */
+  .lane{font-family:var(--mono);font-size:11px;letter-spacing:.14em;font-weight:500}
+  .lane-a{fill:var(--hyperref)}
+  .lane-b{fill:var(--arxiv)}
+  .lane-m{fill:var(--ink-soft)}
+  .box-title{font-family:var(--serif);font-size:15px;font-weight:600;fill:var(--ink)}
+  .box-sub{font-family:var(--mono);font-size:9.5px;fill:var(--ink-soft)}
+  .edge-label{font-family:var(--mono);font-size:9.5px;fill:var(--ink-soft)}
+  .edge-label.b{fill:var(--arxiv)}
+  .edge-label.a{fill:var(--hyperref)}
+  .badge-t{font-family:var(--mono);font-size:10px;font-weight:500;fill:#fff}
+  .legend-t{font-family:var(--mono);font-size:10px;fill:var(--ink-soft)}
+  @media (max-width:640px){
+    .sheet{padding:26px 18px 40px}
+    .cols{columns:1}
+    h1{font-size:22px}
+  }
+  @media print{
+    body{background:#fff;padding:0}
+    .sheet{box-shadow:none;max-width:none}
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <div class="masthead">
+    <span class="id">borrador · v1</span>
+    <span>julio 2026 · diagrama de arquitectura</span>
+  </div>
+
+  <h1>Sistema multiagente de investigación y escritura de artículos científicos</h1>
+  <p class="subtitle">Excavador · Expertos temáticos · Orquestador · Redactor · Verificador, sobre una memoria compartida RAG</p>
+
+  <div class="abstract">
+    <b>Resumen.</b> El sistema opera en dos fases. En la <em>fase A</em> (ingesta, offline) el Excavador
+    recolecta artículos vía APIs académicas; el corpus se filtra, se procesa y se indexa en una biblioteca
+    vectorial. Los Expertos —uno por clúster temático— leen la biblioteca y escriben un Mapa de Síntesis.
+    En la <em>fase B</em> (consulta, online) el Orquestador lee el mapa para rutear la pregunta del usuario
+    hacia los Expertos pertinentes; el Redactor integra sus respuestas en prosa académica con citas y el
+    Verificador coteja cada cita contra la biblioteca antes de entregar el resultado.
+  </div>
+
+  <figure>
+    <div class="fig-frame">
+    <svg viewBox="0 0 980 745" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagrama de flujo del sistema multiagente">
+      <defs>
+        <marker id="mA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#0b4f9e"/>
+        </marker>
+        <marker id="mB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#b31b1b"/>
+        </marker>
+        <marker id="mI" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#565656"/>
+        </marker>
+      </defs>
+
+      <!-- ═══ FASE A : INGESTA ═══ -->
+      <text x="30" y="40" class="lane lane-a">FASE A · INGESTA (OFFLINE, PERIÓDICA)</text>
+
+      <!-- Excavador -->
+      <rect x="30" y="60" width="205" height="70" rx="3" fill="#fff" stroke="#1b1b1b" stroke-width="1.3"/>
+      <text x="132" y="87" text-anchor="middle" class="box-title">Excavador</text>
+      <text x="132" y="104" text-anchor="middle" class="box-sub">APIs: arXiv · OpenAlex · S2</text>
+      <text x="132" y="117" text-anchor="middle" class="box-sub">Crossref · PubMed + snowballing</text>
+
+      <!-- Filtro -->
+      <rect x="270" y="60" width="185" height="70" rx="3" fill="#fff" stroke="#1b1b1b" stroke-width="1.3"/>
+      <text x="362" y="92" text-anchor="middle" class="box-title">Filtro y dedup</text>
+      <text x="362" y="110" text-anchor="middle" class="box-sub">relevancia · duplicados</text>
+
+      <!-- Procesador -->
+      <rect x="490" y="60" width="205" height="70" rx="3" fill="#fff" stroke="#1b1b1b" stroke-width="1.3"/>
+      <text x="592" y="92" text-anchor="middle" class="box-title">Procesador</text>
+      <text x="592" y="110" text-anchor="middle" class="box-sub">PDF → texto + metadatos (GROBID)</text>
+
+      <!-- Indexador -->
+      <rect x="730" y="60" width="220" height="70" rx="3" fill="#fff" stroke="#1b1b1b" stroke-width="1.3"/>
+      <text x="840" y="92" text-anchor="middle" class="box-title">Indexador</text>
+      <text x="840" y="110" text-anchor="middle" class="box-sub">chunking por sección + embeddings</text>
+
+      <!-- flechas fase A -->
+      <line x1="235" y1="95" x2="266" y2="95" stroke="#0b4f9e" stroke-width="1.6" marker-end="url(#mA)"/>
+      <line x1="455" y1="95" x2="486" y2="95" stroke="#0b4f9e" stroke-width="1.6" marker-end="url(#mA)"/>
+      <line x1="695" y1="95" x2="726" y2="95" stroke="#0b4f9e" stroke-width="1.6" marker-end="url(#mA)"/>
+      <line x1="840" y1="130" x2="840" y2="206" stroke="#0b4f9e" stroke-width="1.6" marker-end="url(#mA)"/>
+      <text x="852" y="172" class="edge-label a">indexa</text>
+
+      <!-- ═══ MEMORIA COMPARTIDA ═══ -->
+      <text x="30" y="196" class="lane lane-m">MEMORIA COMPARTIDA (RAG)</text>
+
+      <!-- Mapa de Síntesis -->
+      <rect x="30" y="210" width="300" height="100" rx="3" fill="#f6f4ef" stroke="#1b1b1b" stroke-width="1.3"/>
+      <text x="180" y="252" text-anchor="middle" class="box-title">Mapa de Síntesis</text>
+      <text x="180" y="271" text-anchor="middle" class="box-sub">índice: tema → resumen → expertos</text>
+      <text x="180" y="284" text-anchor="middle" class="box-sub">→ papers que lo sustentan</text>
+
+      <!-- Biblioteca RAG -->
+      <rect x="510" y="210" width="440" height="100" rx="3" fill="#f6f4ef" stroke="#1b1b1b" stroke-width="1.3"/>
+      <text x="730" y="252" text-anchor="middle" class="box-title">Biblioteca RAG</text>
+      <text x="730" y="271" text-anchor="middle" class="box-sub">base vectorial + metadatos filtrables</text>
+      <text x="730" y="284" text-anchor="middle" class="box-sub">fuente de verdad citable</text>
+
+      <!-- ═══ EXPERTOS ═══ -->
+      <text x="510" y="366" class="lane lane-m">EXPERTOS (UNO POR CLÚSTER TEMÁTICO)</text>
+
+      <rect x="510" y="380" width="135" height="75" rx="3" fill="#fff" stroke="#1b1b1b" stroke-width="1.3"/>
+      <text x="577" y="413" text-anchor="middle" class="box-title">Experto A</text>
+      <text x="577" y="431" text-anchor="middle" class="box-sub">tema 1</text>
+
+      <rect x="662" y="380" width="135" height="75" rx="3" fill="#fff" stroke="#1b1b1b" stroke-width="1.3"/>
+      <text x="729" y="413" text-anchor="middle" class="box-title">Experto B</text>
+      <text x="729" y="431" text-anchor="middle" class="box-sub">tema 2</text>
+
+      <rect x="814" y="380" width="135" height="75" rx="3" fill="#fff" stroke="#1b1b1b" stroke-width="1.3"/>
+      <text x="881" y="413" text-anchor="middle" class="box-title">Experto N</text>
+      <text x="881" y="431" text-anchor="middle" class="box-sub">tema n</text>
+
+      <!-- retrieval biblioteca ↔ expertos -->
+      <line x1="577" y1="314" x2="577" y2="376" stroke="#565656" stroke-width="1.4" marker-end="url(#mI)" marker-start="url(#mI)"/>
+      <line x1="729" y1="314" x2="729" y2="376" stroke="#565656" stroke-width="1.4" marker-end="url(#mI)" marker-start="url(#mI)"/>
+      <line x1="881" y1="314" x2="881" y2="376" stroke="#565656" stroke-width="1.4" marker-end="url(#mI)" marker-start="url(#mI)"/>
+      <text x="740" y="348" class="edge-label">retrieval (ambas fases)</text>
+
+      <!-- expertos → mapa -->
+      <path d="M 510 417 L 420 417 L 420 260 L 334 260" fill="none" stroke="#0b4f9e" stroke-width="1.6" marker-end="url(#mA)"/>
+      <text x="430" y="352" class="edge-label a">escriben síntesis</text>
+
+      <!-- ═══ FASE B : CONSULTA ═══ -->
+      <text x="30" y="522" class="lane lane-b">FASE B · CONSULTA Y ESCRITURA (ONLINE)</text>
+
+      <!-- Usuario -->
+      <rect x="30" y="540" width="140" height="80" rx="3" fill="#fff" stroke="#b31b1b" stroke-width="1.5"/>
+      <text x="100" y="575" text-anchor="middle" class="box-title">Usuario</text>
+      <text x="100" y="594" text-anchor="middle" class="box-sub">pregunta / encargo</text>
+
+      <!-- Orquestador -->
+      <rect x="225" y="540" width="225" height="80" rx="3" fill="#fff" stroke="#1b1b1b" stroke-width="1.3"/>
+      <text x="337" y="575" text-anchor="middle" class="box-title">Orquestador</text>
+      <text x="337" y="594" text-anchor="middle" class="box-sub">router + planificador</text>
+
+      <!-- Redactor -->
+      <rect x="505" y="540" width="175" height="80" rx="3" fill="#fff" stroke="#1b1b1b" stroke-width="1.3"/>
+      <text x="592" y="575" text-anchor="middle" class="box-title">Redactor</text>
+      <text x="592" y="594" text-anchor="middle" class="box-sub">prosa académica con citas [n]</text>
+
+      <!-- Verificador -->
+      <rect x="735" y="540" width="195" height="80" rx="3" fill="#fff" stroke="#1b1b1b" stroke-width="1.3"/>
+      <text x="832" y="575" text-anchor="middle" class="box-title">Verificador</text>
+      <text x="832" y="594" text-anchor="middle" class="box-sub">coteja citas vs. biblioteca</text>
+
+      <!-- flechas fase B -->
+      <line x1="170" y1="580" x2="221" y2="580" stroke="#b31b1b" stroke-width="1.6" marker-end="url(#mB)"/>
+      <line x1="450" y1="580" x2="501" y2="580" stroke="#b31b1b" stroke-width="1.6" marker-end="url(#mB)"/>
+      <line x1="680" y1="580" x2="731" y2="580" stroke="#b31b1b" stroke-width="1.6" marker-end="url(#mB)"/>
+
+      <!-- orquestador ↔ mapa -->
+      <line x1="300" y1="536" x2="300" y2="314" stroke="#b31b1b" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#mB)" marker-start="url(#mB)"/>
+      <text x="310" y="470" class="edge-label b">lee el mapa: ¿qué expertos?</text>
+
+      <!-- orquestador ↔ expertos -->
+      <path d="M 420 536 L 420 498 L 545 498 L 545 459" fill="none" stroke="#b31b1b" stroke-width="1.6" marker-end="url(#mB)" marker-start="url(#mB)"/>
+      <text x="440" y="490" class="edge-label b">consulta dirigida</text>
+
+      <!-- verificador ⇢ biblioteca -->
+      <path d="M 930 568 L 962 568 L 962 260 L 954 260" fill="none" stroke="#565656" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#mI)"/>
+
+      <!-- retorno al usuario -->
+      <path d="M 832 620 L 832 672 L 100 672 L 100 624" fill="none" stroke="#b31b1b" stroke-width="1.6" marker-end="url(#mB)"/>
+      <text x="466" y="664" text-anchor="middle" class="edge-label b">artículo / respuesta con referencias verificadas</text>
+
+      <!-- badges de secuencia -->
+      <g>
+        <circle cx="196" cy="562" r="9" fill="#b31b1b"/><text x="196" y="565.5" text-anchor="middle" class="badge-t">1</text>
+        <circle cx="300" cy="430" r="9" fill="#b31b1b"/><text x="300" y="433.5" text-anchor="middle" class="badge-t">2</text>
+        <circle cx="482" cy="474" r="9" fill="#b31b1b"/><text x="482" y="477.5" text-anchor="middle" class="badge-t">3</text>
+        <circle cx="476" cy="562" r="9" fill="#b31b1b"/><text x="476" y="565.5" text-anchor="middle" class="badge-t">4</text>
+        <circle cx="706" cy="562" r="9" fill="#b31b1b"/><text x="706" y="565.5" text-anchor="middle" class="badge-t">5</text>
+        <circle cx="466" cy="640" r="9" fill="#b31b1b"/><text x="466" y="643.5" text-anchor="middle" class="badge-t">6</text>
+      </g>
+
+      <!-- leyenda -->
+      <g transform="translate(30,716)">
+        <line x1="0" y1="0" x2="34" y2="0" stroke="#0b4f9e" stroke-width="1.8"/>
+        <text x="42" y="3.5" class="legend-t">ingesta (offline)</text>
+        <line x1="185" y1="0" x2="219" y2="0" stroke="#b31b1b" stroke-width="1.8"/>
+        <text x="227" y="3.5" class="legend-t">consulta (online)</text>
+        <line x1="376" y1="0" x2="410" y2="0" stroke="#565656" stroke-width="1.6" stroke-dasharray="5 4"/>
+        <text x="418" y="3.5" class="legend-t">lectura de índice / verificación</text>
+        <text x="700" y="3.5" class="legend-t">①–⑥ secuencia de una consulta</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption><span class="figno">Figura 1.</span> Flujo lógico del sistema. La memoria compartida (biblioteca vectorial + mapa de síntesis) desacopla ambas fases: la ingesta puede correr periódicamente sin tocar el flujo de consulta, y el Orquestador nunca lee papers completos — solo el índice. Secuencia online: ① el usuario pregunta; ② el Orquestador lee el Mapa de Síntesis para decidir el ruteo; ③ consulta a los Expertos pertinentes, que hacen <em>retrieval</em> sobre sus particiones de la biblioteca; ④ el Redactor integra las respuestas con citas; ⑤ el Verificador coteja cada cita contra la biblioteca; ⑥ el usuario recibe el texto con referencias verificadas.</figcaption>
+  </figure>
+
+  <section>
+    <h2><span class="num">§1</span>Componentes</h2>
+    <div class="cols">
+      <p><dfn>Excavador.</dfn> No hace scraping libre de la web: consulta APIs académicas (arXiv, OpenAlex, Semantic Scholar, Crossref, PubMed) a partir de consultas semilla derivadas del tema, y expande el corpus siguiendo las referencias de los papers más relevantes (<em>snowballing</em>). Entrega PDFs y metadatos normalizados (DOI, autores, año, venue).</p>
+      <p><dfn>Filtro y deduplicación.</dfn> Descarta duplicados por DOI/título y puntúa relevancia (embedding del abstract vs. el tema) antes de gastar cómputo en procesar el documento completo.</p>
+      <p><dfn>Procesador e Indexador.</dfn> GROBID (u otro parser científico) convierte el PDF en texto estructurado por secciones; el indexador trocea por sección, genera embeddings y los guarda con metadatos filtrables en la base vectorial.</p>
+      <p><dfn>Expertos.</dfn> Uno por clúster temático (agrupamiento de embeddings del corpus), no por autor: los autores crecen sin control y cruzan temas. Offline, cada Experto sintetiza su clúster y escribe el resultado en el Mapa de Síntesis; online, responde consultas dirigidas haciendo <em>retrieval</em> sobre su partición y devolviendo pasajes citables.</p>
+      <p><dfn>Orquestador.</dfn> Agente router y planificador, separado del RAG. Lee el Mapa de Síntesis completo (es compacto), descompone la pregunta del usuario, decide a qué Expertos consultar y en qué orden, y entrega el material al Redactor.</p>
+      <p><dfn>Redactor y Verificador.</dfn> El Redactor convierte las respuestas de los Expertos en prosa académica con citas numeradas; el Verificador comprueba que cada afirmación citada exista realmente en la biblioteca y corresponda al paper referido. Nada llega al usuario sin pasar por él.</p>
+    </div>
+  </section>
+
+  <div class="delta">
+    <h2><span class="num">§2</span>Cambios respecto a la propuesta original</h2>
+    <p><b>a)</b> El Excavador usa APIs académicas en lugar de rastrear "toda la web": más robusto, legal y con metadatos limpios.</p>
+    <p><b>b)</b> Los Expertos se organizan por clúster temático y no por autor, para que el número de agentes escale con los temas y no con la bibliografía.</p>
+    <p><b>c)</b> El Orquestador no es parte del RAG: el RAG es la memoria compartida; el Orquestador es un agente que la consulta.</p>
+    <p><b>d)</b> Se añaden el Redactor y el Verificador: sin ellos el sistema investiga pero no escribe, y las citas alucinadas quedarían sin control.</p>
+  </div>
+
+  <footer>
+    <span>arquitectura-sistema-investigacion.html</span>
+    <span>diagrama estático · sin dependencias de ejecución</span>
+  </footer>
+</div>
+</body>
+</html>
