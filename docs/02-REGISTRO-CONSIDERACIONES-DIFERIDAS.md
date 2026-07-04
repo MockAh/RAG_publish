@@ -1,0 +1,164 @@
+# 02 · Registro de consideraciones diferidas — Excavador
+
+> Compañero del plan de implementación. Recoge todo lo que decidimos **anotar
+> en vez de resolver ahora**: hallazgos durante la construcción, deuda técnica
+> aceptada, y verificaciones que se posponen a T13 o a fases posteriores.
+> Estado: vivo · actualizar al cerrar cada tarea. Corte actual: **T5 firmado, T6 en curso**.
+
+---
+
+## A · Hallazgos de datos reales (confirmados contra el corpus, no supuestos)
+
+### A1 · Abstracts de OpenAlex con diacríticos degradados en origen
+**Descubierto en:** T4 (llamada real `search_exact_phrase("Bolívar Echeverría")`).
+**Qué:** el `abstract_inverted_index` de OpenAlex entrega palabras ya sin acentos
+(`"Bolvar"`, `"Echeverra"`, y variantes inconsistentes como `"Echeverria's"` junto a
+`"Echeverra's"`). El daño viene del depósito del publisher, no de nuestro código:
+`invert_abstract` se verificó inocente.
+**Por qué no se corrige:**
+- e5 es robusto a esa pérdida para el scoring de relevancia.
+- El dedup usa *títulos* (que vienen limpios) y además les quita acentos a propósito (T6).
+- Los chunks citables de la fase 03 vendrán del PDF vía GROBID, no del abstract;
+  solo los papers **sin** PDF se indexan por abstract y arrastrarían este ruido.
+**Consecuencia a vigilar:** en fase 03, los papers sin PDF tendrán texto citable de
+menor calidad tipográfica. Aceptable; anotarlo si el Verificador (fase 05) se queja.
+
+### A2 · Abstracts en inglés para papers en español
+**Descubierto en:** T4 (el primer hit, artículo de *Íconos* en español, trae abstract en inglés).
+**Qué:** revistas latinoamericanas frecuentemente depositan el abstract en inglés
+aunque el cuerpo sea español. El corpus mezclará idiomas **dentro del mismo registro**.
+**Estatus:** no es problema — es la justificación empírica del modelo multilingüe.
+El test slow de T7 puede verificar que tema-es ↔ abstract-en quedan cercanos en el
+espacio vectorial. Refuerza la decisión A6 del plan (e5 multilingüe), no la contradice.
+
+---
+
+## B · Deuda técnica aceptada (código que funciona pero podría mejorarse)
+
+### B1 · Conexión SQLite nunca se cierra explícitamente
+**Origen:** T2 (`storage.py`).
+**Qué:** no hay `close()` ni context manager; la conexión vive hasta que el proceso muere.
+**Por qué se acepta en v1:** la pipeline crea un `Storage` por corrida; el SO libera al salir.
+**Gatillo para revisar:** si T11 convierte `Storage` en context manager o añade `close()`,
+aceptarlo como mejora. No forzarlo ahora.
+
+### B2 · `per-page=200` fijo aunque `max_results` sea menor
+**Origen:** T4 (`openalex.py`, `_paginated_works`).
+**Qué:** pide 200 resultados por página aunque solo quieras 10. Desperdicia algo de ancho de banda.
+**Por qué se acepta:** jamás afecta corrección, solo eficiencia marginal. OpenAlex lo tolera.
+**Gatillo:** solo si en T13 la latencia de búsqueda molesta; improbable.
+
+### B3 · `canonical_enrich` no completa el DOI faltante
+**Origen:** T5 (`normalize.py`).
+**Qué:** si un hit (p. ej. de S2) llega sin DOI pero OpenAlex sí lo conoce, el enriquecimiento
+completa abstract/venue/refs/work_type pero **no** rellena el DOI ni recalcula el `paper_id`.
+El record conserva su `paper_id` de fallback (`semanticscholar:<id>`).
+**Consecuencia:** ese record dedupeará por (título, año), no por DOI (ver C1 abajo).
+**Sospechoso nº1** si en T13 aparecen duplicados residuales entre S2 y OpenAlex.
+**Decisión:** fiel a la spec; el fallback existe justo para esto. Revisar solo con evidencia en T13.
+
+---
+
+## C · Comportamientos deliberados que parecen bugs (no tocar sin causa)
+
+### C1 · Record con DOI y record sin DOI NO se dedupean entre sí
+**Definido en:** T6 (spec del prompt).
+**Qué:** las claves de agrupación son distintas — `("doi", ...)` vs `("title", ..., year)` —
+así que dos versiones del mismo paper, una con DOI y otra sin, no colisionan.
+**Por qué es deliberado:** evita fusiones erróneas por títulos genéricos coincidentes.
+El enriquecimiento canónico (A2 del plan) minimiza el caso al poblar DOIs antes del dedup.
+**Interacción con B3:** si el enriquecimiento no logra el DOI, este caso se materializa.
+Es el mecanismo por el que B3 se vuelve visible.
+
+### C2 · NFD sobre «ñ» produce «n» (Diseño → diseno)
+**Definido en:** T6 (`normalize_title`).
+**Qué:** la descomposición Unicode trata «ñ» como n + tilde combinante y la elimina.
+**Por qué es correcto para dedup:** un título depositado sin eñe en una API y con eñe en otra
+debe colapsar a un solo registro. Para *dedup* esto es la conducta deseada.
+**Ojo:** esto es solo para la CLAVE de dedup. El título *almacenado* conserva su «ñ» intacta
+(el ganador se guarda tal cual; solo su clave se normaliza). No confundir ambos.
+
+---
+
+## D · Verificaciones y calibraciones pospuestas a T13 (corrida real)
+
+### D1 · Umbral de relevancia — calibración con evidencia
+**Default:** 0.35 (config). **Pendiente:** revisar `papers_discarded` con score en [0.25, umbral].
+Si hay falsos descartes relevantes → bajar. Si en aceptados hay ruido (papers que solo citan
+a Echeverría de pasada) → subir. En tema-autor probablemente suba. **Documentar valor final.**
+Criterio de aceptación 6 del plan.
+
+### D2 · Criterio de PDFs recalibrado a ≥ 40 %
+**Origen:** decisión A8. El 60 % original es para STEM (cobertura arXiv). Humanidades en
+español tiene cobertura OA estructuralmente menor. Verificar el % real en T13 y, si queda
+muy por debajo del 40 %, no es necesariamente un bug: puede ser el techo del dominio. Anotar el valor.
+
+### D3 · Duplicados residuales por DOI
+**Verificación:** `SELECT doi, COUNT(*) FROM papers WHERE doi IS NOT NULL GROUP BY doi
+HAVING COUNT(*)>1` debe salir **vacío**. Si no: revisar B3/C1 como causa probable.
+
+### D4 · Idempotencia extremo a extremo
+Re-ejecución completa de la pipeline: `count()` idéntico antes y después. Garantizado en
+teoría por los upserts; verificar en la práctica con red real (puede haber no-determinismo
+en el orden de llegada de las APIs que exponga algún supuesto).
+
+### D5 · Revisión humana del top-20 por score
+Los 20 papers de mayor `relevance_score` deben ser, a ojo, inequívocamente sobre Echeverría.
+Es la prueba de que el scoring semántico + búsqueda exacta funcionan juntos.
+
+---
+
+## E · Cuestiones abiertas que tocan otras fases (propagar cuando lleguen)
+
+### E1 · Tablas y fórmulas de GROBID (fase 03)
+La spec 03 tiene abierto si indexar/ignorar/separar tablas y fórmulas. No es asunto del
+Excavador, pero el corpus de humanidades tendrá pocas — probablemente baja prioridad allí.
+
+### E2 · Overlap de chunks (fase 03)
+Abierto en spec 03: ¿chunks con solapamiento o sin él? Se decide con las 10 preguntas de prueba
+de esa fase. Mención aquí solo para no perderlo de vista.
+
+### E3 · Obras primarias de Echeverría sin PDF OA
+**Contexto:** los libros del propio Echeverría (Era, FCE) casi nunca tendrán PDF abierto;
+entrarán como registros con `pdf_path=None` + abstract. El corpus **verificable** será la
+literatura secundaria; el conocimiento de las obras primarias lo aporta el usuario.
+Esto afecta la expectativa de cobertura (D2) y el diseño de síntesis en fase 04.
+
+---
+
+## F · Higiene de proceso (aprendido sobre la marcha)
+
+### F1 · Dos-Pythons: activar `.venv` siempre
+Verificar el intérprete antes de correr comandos: la cabecera de pytest debe decir
+`.venv/bin/python`, no `/usr/bin/python3`. En VS Code: "Python: Select Interpreter" → `.venv`.
+Copilot ya tropezó con esto una vez (corrió `pip install` con el pip del sistema y recibió
+`externally-managed-environment`); inofensivo pero reconocible.
+
+### F2 · Un commit por tarea firmada
+Cada T que pasa sus criterios de "hecho" → un commit con mensaje `TN: descripción`.
+Es la red de seguridad para revertir si una tarea posterior rompe algo.
+
+### F3 · Ruta real de los docs en el repo
+Los contratos viven en `docs/01-CONTRATOS-DE-DATOS_v11.md` (con sufijo `_v11`) y
+`docs/02-PLAN-IMPLEMENTACION-EXCAVADOR.md`. El preámbulo de cada prompt debe usar la ruta exacta.
+
+---
+
+## Estado de tareas
+
+| Tarea | Estado | Commit |
+|-------|--------|--------|
+| T0 · Bootstrap | ✅ firmado | sí |
+| T1 · Modelos C1 | ✅ firmado | sí |
+| T2 · Storage SQLite | ✅ firmado | sí |
+| T3 · ApiClient base | ✅ firmado | sí |
+| T4 · Cliente OpenAlex | ✅ firmado | sí |
+| T5 · Normalización | ✅ firmado | sí |
+| T6 · Dedup | 🔄 en curso | — |
+| T7 · Relevancia (e5) | ⏳ pendiente | — |
+| T8 · Crossref + S2 | ⏳ pendiente | — |
+| T9 · Snowball | ⏳ pendiente | — |
+| T10 · Descarga PDFs | ⏳ pendiente | — |
+| T11 · Pipeline | ⏳ pendiente | — |
+| T12 · CLI | ⏳ pendiente | — |
+| T13 · Corrida real | ⏳ pendiente | — |
