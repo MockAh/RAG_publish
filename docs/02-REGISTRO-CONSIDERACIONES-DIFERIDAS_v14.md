@@ -3,7 +3,7 @@
 > Compañero del plan de implementación. Recoge todo lo que decidimos **anotar
 > en vez de resolver ahora**: hallazgos durante la construcción, deuda técnica
 > aceptada, y verificaciones que se posponen a T13 o a fases posteriores.
-> Estado: vivo · actualizar al cerrar cada tarea. Corte actual: **T8 firmado, T9 en curso**.
+> Estado: vivo · actualizar al cerrar cada tarea. Corte actual: **T9 firmado, T10 en curso**.
 
 ---
 
@@ -194,8 +194,8 @@ se rotó (o debe rotarse). Regla: antes de compartir logs, revisar si contienen 
 | T6 · Dedup | ✅ firmado | sí |
 | T7 · Relevancia (e5) | ✅ firmado | sí |
 | T8 · Crossref + S2 | ✅ firmado | sí |
-| T9 · Snowball | 🔄 en curso | — |
-| T10 · Descarga PDFs | ⏳ pendiente | — |
+| T9 · Snowball | ✅ firmado | sí |
+| T10 · Descarga PDFs | 🔄 en curso | — |
 | T11 · Pipeline | ⏳ pendiente | — |
 | T12 · CLI | ⏳ pendiente | — |
 | T13 · Corrida real | ⏳ pendiente | — |
