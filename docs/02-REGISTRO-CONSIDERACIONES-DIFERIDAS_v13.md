@@ -3,7 +3,7 @@
 > Compañero del plan de implementación. Recoge todo lo que decidimos **anotar
 > en vez de resolver ahora**: hallazgos durante la construcción, deuda técnica
 > aceptada, y verificaciones que se posponen a T13 o a fases posteriores.
-> Estado: vivo · actualizar al cerrar cada tarea. Corte actual: **T7 firmado, T8 en curso**.
+> Estado: vivo · actualizar al cerrar cada tarea. Corte actual: **T8 firmado, T9 en curso**.
 
 ---
 
@@ -171,6 +171,14 @@ Es la red de seguridad para revertir si una tarea posterior rompe algo.
 Los contratos viven en `docs/01-CONTRATOS-DE-DATOS_v11.md` (con sufijo `_v11`) y
 `docs/02-PLAN-IMPLEMENTACION-EXCAVADOR.md`. El preámbulo de cada prompt debe usar la ruta exacta.
 
+### F4 · Tests de Settings deben aislarse del `.env` real; los logs imprimen secretos
+**Descubierto en:** T8 (fallo de `test_settings_defaults...` al añadir la API key de S2 al `.env`).
+**Qué:** (a) todo test que instancie `Settings()` debe hacer `monkeypatch.chdir(tmp_path)`
+primero, o hereda el `.env` real del repo y se vuelve dependiente del entorno de la máquina.
+(b) Los tracebacks de pytest imprimen el repr completo de Settings, **incluidos los secretos**:
+un log de test pegado en cualquier lado filtra la API key. La key de S2 expuesta el 2026-07-05
+se rotó (o debe rotarse). Regla: antes de compartir logs, revisar si contienen valores de Settings.
+
 ---
 
 ## Estado de tareas
@@ -185,8 +193,8 @@ Los contratos viven en `docs/01-CONTRATOS-DE-DATOS_v11.md` (con sufijo `_v11`) y
 | T5 · Normalización | ✅ firmado | sí |
 | T6 · Dedup | ✅ firmado | sí |
 | T7 · Relevancia (e5) | ✅ firmado | sí |
-| T8 · Crossref + S2 | 🔄 en curso | — |
-| T9 · Snowball | ⏳ pendiente | — |
+| T8 · Crossref + S2 | ✅ firmado | sí |
+| T9 · Snowball | 🔄 en curso | — |
 | T10 · Descarga PDFs | ⏳ pendiente | — |
 | T11 · Pipeline | ⏳ pendiente | — |
 | T12 · CLI | ⏳ pendiente | — |
