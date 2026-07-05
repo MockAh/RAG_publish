@@ -29,3 +29,4 @@ packages = ["excavador"]
 markers = [
     "slow: usa el modelo real de embeddings",
 ]
+addopts = "-m 'not slow'"

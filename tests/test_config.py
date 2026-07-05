@@ -8,8 +8,9 @@ from pydantic import ValidationError
 from excavador.config import Settings
 
 
-def test_settings_defaults_with_required_mailto(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_settings_defaults_with_required_mailto(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """`openalex_mailto` es obligatorio; el resto de campos usan sus defaults."""
+    monkeypatch.chdir(tmp_path)  # cwd sin .env: no hereda el mailto del repo    
     monkeypatch.setenv("EXCAVADOR_OPENALEX_MAILTO", "test@example.com")
 
     settings = Settings()

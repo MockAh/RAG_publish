@@ -1,0 +1,9 @@
+{
+  "offset": 0,
+  "next": null,
+  "data": [
+    {"citedPaper": {"paperId": "ref1"}},
+    {"citedPaper": null},
+    {"citedPaper": {"paperId": "ref3"}}
+  ]
+}

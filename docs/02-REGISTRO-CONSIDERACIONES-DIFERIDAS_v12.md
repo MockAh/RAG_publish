@@ -3,7 +3,7 @@
 > Compañero del plan de implementación. Recoge todo lo que decidimos **anotar
 > en vez de resolver ahora**: hallazgos durante la construcción, deuda técnica
 > aceptada, y verificaciones que se posponen a T13 o a fases posteriores.
-> Estado: vivo · actualizar al cerrar cada tarea. Corte actual: **T6 firmado, T7 en curso**.
+> Estado: vivo · actualizar al cerrar cada tarea. Corte actual: **T7 firmado, T8 en curso**.
 
 ---
 
@@ -44,9 +44,16 @@ re-mapeado a [0,1], o distancia, o un modelo no normalizado). No es bug de códi
 el scoring en escala cruda es correcto (así lo pide el plan); es el *parámetro* el que
 está en la moneda equivocada.
 **Qué esperar:** el umbral final probablemente viva en **~0.75–0.85**, no cerca de 0.35.
-El valor exacto sale de T13 con la tabla de descartados (D1). El test slow de T7 dará la
-**primera evidencia empírica**: los dos scores que imprima (abstract on-topic vs.
-off-topic) acotan por dónde anda la frontera real.
+**EVIDENCIA EMPÍRICA (test slow de T7, 2026-07-04):** con el modelo real,
+tema "recepción crítica de Bolívar Echeverría, filosofía de la cultura":
+- abstract on-topic (modernidad barroca, en inglés) → **0.827**
+- abstract off-topic (química orgánica, paladio) → **0.699**
+Lecturas: (a) el piso del espacio es ~0.70 — hasta lo más ajeno puntúa eso; el 0.35 no
+filtraría nada, confirmado. (b) La banda de discriminación es ANGOSTA (~13 centésimas
+entre lo perfecto y lo absolutamente ajeno): los casos fronterizos de T13 (menciones de
+pasada) vivirán apretados en ~0.72–0.78. La calibración con `papers_discarded` será fina.
+(c) El score 0.827 con abstract en INGLÉS y tema en ESPAÑOL valida de paso A2 (alineación
+multilingüe de e5 funcionando).
 **Acción:** no cambiar el default en config todavía — se ajusta con datos en T13. Solo
 tener presente que un umbral bajo en las primeras corridas de prueba dejará pasar ruido,
 y eso es esperado, no un fallo.
@@ -177,8 +184,8 @@ Los contratos viven en `docs/01-CONTRATOS-DE-DATOS_v11.md` (con sufijo `_v11`) y
 | T4 · Cliente OpenAlex | ✅ firmado | sí |
 | T5 · Normalización | ✅ firmado | sí |
 | T6 · Dedup | ✅ firmado | sí |
-| T7 · Relevancia (e5) | 🔄 en curso | — |
-| T8 · Crossref + S2 | ⏳ pendiente | — |
+| T7 · Relevancia (e5) | ✅ firmado | sí |
+| T8 · Crossref + S2 | 🔄 en curso | — |
 | T9 · Snowball | ⏳ pendiente | — |
 | T10 · Descarga PDFs | ⏳ pendiente | — |
 | T11 · Pipeline | ⏳ pendiente | — |
