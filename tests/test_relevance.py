@@ -163,3 +163,21 @@ def test_real_model_scores_spanish_topic_higher_for_related_english_abstract() -
     print(f"related_score={related_score} unrelated_score={unrelated_score}")
 
     assert related_score > unrelated_score
+
+def test_score_returns_native_python_float_even_with_numpy_vectors() -> None:
+    """Regresión: el encoder real devuelve numpy; model_copy no valida, así que
+    un np.float32 llegaría intacto hasta SQLite y se guardaría como BLOB."""
+    import numpy as np
+
+    r = _record(title="Numpy", abstract="")
+    encoder = _DummyEncoder(
+        {
+            "query: tema": np.array([1.0, 0.0], dtype=np.float32),
+            "passage: Numpy. ": np.array([1.0, 0.0], dtype=np.float32),
+        }
+    )
+    scorer = _scorer_with_encoder(encoder)
+
+    scored = scorer.score("tema", [r])
+
+    assert type(scored[0].relevance_score) is float

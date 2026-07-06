@@ -62,7 +62,7 @@ class RelevanceScorer:
         scored_records = []
         for record, vector in zip(records, passage_vectors):
             cosine = _cosine_similarity(query_vector, vector)
-            clipped = max(0.0, min(1.0, cosine))
+            clipped = float(max(0.0, min(1.0, cosine)))  # np.float32 -> float nativo; model_copy NO valida
             scored_records.append(record.model_copy(update={"relevance_score": clipped}))
         return scored_records
 
