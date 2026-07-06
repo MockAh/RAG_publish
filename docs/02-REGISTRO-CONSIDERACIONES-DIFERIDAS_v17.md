@@ -3,7 +3,7 @@
 > Compañero del plan de implementación. Recoge todo lo que decidimos **anotar
 > en vez de resolver ahora**: hallazgos durante la construcción, deuda técnica
 > aceptada, y verificaciones que se posponen a T13 o a fases posteriores.
-> Estado: vivo · actualizar al cerrar cada tarea. Corte actual: **T9 firmado, T10 en curso**.
+> Estado: vivo · actualizar al cerrar cada tarea. Corte actual: **T12 firmado — código completo; T13 (corrida real + calibración) en curso**.
 
 ---
 
@@ -58,6 +58,20 @@ multilingüe de e5 funcionando).
 tener presente que un umbral bajo en las primeras corridas de prueba dejará pasar ruido,
 y eso es esperado, no un fallo.
 
+### A4 · Corrida de humo (T12, tema="Bolívar Echeverría", max=10): predicciones confirmadas
+**Números:** 350 raw · 81 dup · **0 low_relevance** · 10 aceptados (tope) · 1 PDF (10 %) ·
+30 % DOI · 443.7 s.
+**Lecturas:** (a) `low_relevance=0` confirma A3 en producción: con umbral 0.35 nada se
+descarta; el corte por max_papers hizo toda la selección y `papers_discarded` no acumuló
+scores. (b) El bajo % de PDF/DOI del top-10 es coherente con E3: el tema de humo era solo
+el nombre, y lo más similar al puro nombre son las obras primarias (libros sin DOI/OA), no
+la literatura secundaria. El tema completo de T13 inclina el espacio hacia la secundaria.
+(c) 443 s fueron mayormente costos fijos (carga del modelo vía drvfs, embeddings de ~269
+candidatos); T13 con 300 papers ≈ 15–30 min, no proporcional.
+**Consecuencia para T13:** la calibración va en dos pasos — corrida completa con umbral
+default para poblar 300 scores reales, luego distribución por SQL para elegir el umbral
+(no depender de `papers_discarded`, que estará vacía de low_relevance).
+
 ---
 
 ## B · Deuda técnica aceptada (código que funciona pero podría mejorarse)
@@ -84,6 +98,14 @@ El record conserva su `paper_id` de fallback (`semanticscholar:<id>`).
 **Sospechoso nº1** si en T13 aparecen duplicados residuales entre S2 y OpenAlex.
 **Decisión:** fiel a la spec; el fallback existe justo para esto. Revisar solo con evidencia en T13.
 
+### B4 · `pipeline._dedup_key` replica la clave privada de `dedup._group_key`
+**Origen:** T11 (el `accepted_keys` en memoria necesita la misma clave que usa T6).
+**Qué:** la lógica de la clave de agrupación existe en dos lugares. Si algún día cambia en
+`dedup.py`, la copia de `pipeline.py` divergiría en silencio.
+**Por qué se acepta:** evitó tocar `dedup.py` (regla de no modificar módulos firmados) y la
+clave es estable. **Gatillo:** si T6 alguna vez cambia su clave, mover `_group_key` a función
+pública y que ambos la importen.
+
 ---
 
 ## C · Comportamientos deliberados que parecen bugs (no tocar sin causa)
@@ -105,6 +127,25 @@ debe colapsar a un solo registro. Para *dedup* esto es la conducta deseada.
 **Ojo:** esto es solo para la CLAVE de dedup. El título *almacenado* conserva su «ñ» intacta
 (el ganador se guarda tal cual; solo su clave se normaliza). No confundir ambos.
 
+### C3 · Re-corrida con `max_papers` truncante puede "promover" candidatos antes cortados
+**Descubierto en:** T11 (diseño de tests de idempotencia).
+**Qué:** si una corrida trunca por `max_papers`, los cortados no se guardan ni se descartan.
+En una re-corrida, los que sí se guardaron ya son "conocidos" (se saltan sin competir), así
+que candidatos antes cortados pueden entrar al cupo: `storage.count()` puede crecer entre
+corridas idénticas cuando hubo truncamiento.
+**Por qué es deliberado:** propiedad del orden filtrar-antes-de-cortar. La idempotencia
+estricta (count idéntico) se garantiza cuando `max_papers` no trunca; con truncamiento, el
+sistema *converge* en corridas sucesivas en vez de en una. Para D4 (T13): la verificación de
+idempotencia debe hacerse con el corpus ya convergido o con cupo holgado.
+
+### C4 · Precedencia del `raw` en duplicados: OpenAlex gana (fix manual en T11)
+**Qué:** el dict `paper_id → raw` que alimenta la descarga sufría last-write-wins cuando dos
+fuentes compartían DOI: el ganador del dedup (OpenAlex) podía recibir el raw del perdedor
+(S2), perdiendo `best_oa_location` → PDFs perdidos justo en los papers multi-fuente (que
+suelen ser los importantes). **Fix aplicado:** el raw de OpenAlex siempre pisa; entre
+no-OpenAlex, el primero queda. Si en T13 el % de PDF sale sospechosamente bajo, verificar
+primero que este fix sigue en su sitio.
+
 ---
 
 ## D · Verificaciones y calibraciones pospuestas a T13 (corrida real)
@@ -121,6 +162,10 @@ actualizar el default en config una vez calibrado.** Criterio de aceptación 6 d
 **Origen:** decisión A8. El 60 % original es para STEM (cobertura arXiv). Humanidades en
 español tiene cobertura OA estructuralmente menor. Verificar el % real en T13 y, si queda
 muy por debajo del 40 %, no es necesariamente un bug: puede ser el techo del dominio. Anotar el valor.
+**Primer dato (T10, muestra n=5 del top de búsqueda exacta):** 4/5 con PDF descargado (80 %) —
+SciELO/FLACSO/UNAM/USP. El fallido fue una landing HTML de biblat correctamente rechazada por
+el guardián `%PDF-`. Muestra pequeña y sesgada al top (los más citados suelen ser OA); el % de
+T13 sobre ~300 papers será menor, pero el arranque es alentador.
 
 ### D3 · Duplicados residuales por DOI
 **Verificación:** `SELECT doi, COUNT(*) FROM papers WHERE doi IS NOT NULL GROUP BY doi
@@ -195,7 +240,7 @@ se rotó (o debe rotarse). Regla: antes de compartir logs, revisar si contienen 
 | T7 · Relevancia (e5) | ✅ firmado | sí |
 | T8 · Crossref + S2 | ✅ firmado | sí |
 | T9 · Snowball | ✅ firmado | sí |
-| T10 · Descarga PDFs | 🔄 en curso | — |
-| T11 · Pipeline | ⏳ pendiente | — |
-| T12 · CLI | ⏳ pendiente | — |
-| T13 · Corrida real | ⏳ pendiente | — |
+| T10 · Descarga PDFs | ✅ firmado | sí |
+| T11 · Pipeline | ✅ firmado | sí |
+| T12 · CLI | ✅ firmado | sí |
+| T13 · Corrida real | 🔄 en curso | — |
