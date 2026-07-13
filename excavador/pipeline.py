@@ -230,7 +230,9 @@ def run(
     accepted = accepted[:max_papers]
 
     # h. Descarga de PDFs (un solo httpx.Client compartido).
-    with httpx.Client() as client:
+    with httpx.Client(
+        headers={"User-Agent": f"excavador/0.1 (mailto:{settings.openalex_mailto})"}
+    ) as client:
         for i, record in enumerate(accepted):
             pdf_path = download_pdf(record, raws.get(record.paper_id), settings.pdf_dir, client)
             if pdf_path is not None:

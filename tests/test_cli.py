@@ -105,8 +105,8 @@ def test_run_threshold_overrides_settings_without_mutating(
 
     assert result.exit_code == 0
     assert captured["settings"].relevance_threshold == 0.8
-    # el default de Settings() sigue siendo 0.35: confirma que no se mutó una instancia compartida.
-    assert Settings().relevance_threshold == 0.35
+    # el default de Settings() sigue siendo 0.78: confirma que no se mutó una instancia compartida.
+    assert Settings().relevance_threshold == 0.78
 
 
 def test_stats_shows_totals_title_and_discard_reasons(

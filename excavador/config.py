@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     db_path: Path = Path("data/excavador.db")
     pdf_dir: Path = Path("data/pdfs")
-    relevance_threshold: float = 0.35
+    relevance_threshold: float = 0.78
     snowball_k: int = 15
     openalex_mailto: str
     semanticscholar_api_key: str | None = None

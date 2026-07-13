@@ -18,7 +18,7 @@ def test_settings_defaults_with_required_mailto(monkeypatch: pytest.MonkeyPatch,
     assert settings.openalex_mailto == "test@example.com"
     assert settings.db_path == Path("data/excavador.db")
     assert settings.pdf_dir == Path("data/pdfs")
-    assert settings.relevance_threshold == 0.35
+    assert settings.relevance_threshold == 0.78
     assert settings.snowball_k == 15
     assert settings.semanticscholar_api_key is None
     assert settings.embedding_model == "intfloat/multilingual-e5-large"

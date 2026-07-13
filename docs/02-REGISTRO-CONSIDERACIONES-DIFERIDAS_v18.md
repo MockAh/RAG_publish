@@ -224,6 +224,20 @@ primero, o hereda el `.env` real del repo y se vuelve dependiente del entorno de
 un log de test pegado en cualquier lado filtra la API key. La key de S2 expuesta el 2026-07-05
 se rotó (o debe rotarse). Regla: antes de compartir logs, revisar si contienen valores de Settings.
 
+### F5 · `model_copy(update=...)` NO valida — y numpy se cuela hasta SQLite como BLOB
+**Descubierto en:** T13 (crash de `stats` tras la primera corrida real de 300 papers).
+**Qué:** el encoder real de e5 devuelve numpy; el coseno resultó `np.float32`;
+`model_copy(update=...)` lo metió al modelo **sin ejecutar la validación de pydantic**
+(propiedad documentada de model_copy — el `Field(ge=0, le=1)` nunca corrió); sqlite3
+guardó el `np.float32` como BLOB de 4 bytes vía el protocolo buffer, sin error ni warning.
+El fallo solo apareció al *leer* (pydantic sí valida en construcción). Los 80 tests no lo
+atraparon porque todos los encoders de test devuelven listas/floats de Python — numpy solo
+entra con el modelo real + persistencia, combinación que ningún test ejercitaba.
+**Fix:** `float(...)` explícito en `relevance.score` + test de regresión con vectores numpy
++ reparación in situ de los BLOBs (float32 little-endian, recuperable con struct).
+**Regla general:** toda frontera modelo→persistencia convierte a tipos nativos; nunca
+confiar en que `model_copy` valide.
+
 ---
 
 ## Estado de tareas
