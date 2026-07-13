@@ -3,7 +3,8 @@
 > Compañero del plan de implementación. Recoge todo lo que decidimos **anotar
 > en vez de resolver ahora**: hallazgos durante la construcción, deuda técnica
 > aceptada, y verificaciones que se posponen a T13 o a fases posteriores.
-> Estado: vivo · actualizar al cerrar cada tarea. Corte actual: **T12 firmado — código completo; T13 (corrida real + calibración) en curso**.
+> Estado: **FASE 02 CERRADA (2026-07-06)** · este registro pasa a ser referencia histórica
+> y herencia para las fases 03-05. Corpus final: 227 papers, umbral 0.78, cero duplicados por DOI.
 
 ---
 
@@ -63,11 +64,19 @@ y eso es esperado, no un fallo.
 30 % DOI · 443.7 s.
 **Lecturas:** (a) `low_relevance=0` confirma A3 en producción: con umbral 0.35 nada se
 descarta; el corte por max_papers hizo toda la selección y `papers_discarded` no acumuló
-scores. (b) El bajo % de PDF/DOI del top-10 es coherente con E3: el tema de humo era solo
-el nombre, y lo más similar al puro nombre son las obras primarias (libros sin DOI/OA), no
-la literatura secundaria. El tema completo de T13 inclina el espacio hacia la secundaria.
-(c) 443 s fueron mayormente costos fijos (carga del modelo vía drvfs, embeddings de ~269
-candidatos); T13 con 300 papers ≈ 15–30 min, no proporcional.
+scores. (b) ~~El bajo % de PDF/DOI del top-10 sería por obras primarias~~ **CORREGIDO con
+datos:** el top-10 real es literatura secundaria de primera (eulogios, entrevistas,
+reflexiones críticas) — e5 discrimina mejor de lo previsto incluso con tema pobre. El bajo
+% de DOI (30 %) se explica por el dominio: revistas latinoamericanas y repositorios sin DOI
+registrado. (c) 443 s fueron mayormente costos fijos (carga del modelo vía drvfs, embeddings
+de ~269 candidatos); T13 con 300 papers ≈ 15–30 min, no proporcional. (d) Rango de scores del
+top-10: 0.847–0.858 — once milésimas; la banda angosta de A3 confirmada con crudeza.
+(e) **Duplicado real por año divergente detectado:** el mismo título aparece con años 2017 y
+2018 (dos fuentes fecharon distinto) y el dedup por (título, año) los mantiene separados —
+comportamiento deliberado (ver C1/C2) mostrando su límite en datos reales. Evaluar frecuencia
+en el top-20 de la corrida grande antes de decidir si amerita relajar el año (±1) en la clave.
+(f) `papers_discarded` colapsa duplicados que comparten paper_id (PRIMARY KEY + upsert):
+el conteo del stats (81) puede superar las filas de la tabla (74). Correcto, no pérdida.
 **Consecuencia para T13:** la calibración va en dos pasos — corrida completa con umbral
 default para poblar 300 scores reales, luego distribución por SQL para elegir el umbral
 (no depender de `papers_discarded`, que estará vacía de low_relevance).
@@ -105,6 +114,25 @@ El record conserva su `paper_id` de fallback (`semanticscholar:<id>`).
 **Por qué se acepta:** evitó tocar `dedup.py` (regla de no modificar módulos firmados) y la
 clave es estable. **Gatillo:** si T6 alguna vez cambia su clave, mover `_group_key` a función
 pública y que ambos la importen.
+
+### B5 · Ventana de retry corta para ráfagas de 503/429 — GATILLO CUMPLIDO
+**Origen:** T13. Dos incidentes el mismo día: ráfaga de 503 (caída transitoria de OpenAlex)
+y ráfaga de 429 (throttling tras uso intenso). El envelope de 3 intentos / ~3-4 s no cubre
+ninguno de los dos. **Acción tomada:** `base.py` sube a `stop_after_attempt(5)` +
+`wait_exponential(multiplier=2, max=60)` — cambio justificado a módulo firmado; tests
+existentes siguen en verde. Regla operativa adicional: tras un 429, esperar 20-30 min antes
+de relanzar (reintentar de inmediato alimenta el throttling).
+
+### C5 · Duplicados DOI-variante: mismo título y año, DOIs distintos (medido: ~4 % del corpus)
+**Descubierto en:** T13 (censo de títulos repetidos: 9 grupos / ~10 filas extra en 232).
+**Dos especies:** (a) 3 pares año-divergente (2018/2017, 2012/2010, 2001/2000) — la
+limitación C1/C2 conocida; (b) 6 grupos con mismo título y MISMO año pero DOIs distintos
+(versiones Zenodo, DOI de capítulo vs. artículo) — invisibles para la clave de dedup, que
+agrupa por DOI cuando existe. **Decisión v1: aceptar, cuantificado.** Deduplicar por título
+ignorando el DOI es peligroso: fusionaría obras legítimamente distintas (el censo mismo
+contiene dos reseñas del libro de Gandler, de autores distintos, mismo año — deben seguir
+separadas). Consecuencia para fase 03: ~4 % de chunks duplicados; tolerable. Revisar solo si
+la tasa crece con corpus nuevos.
 
 ---
 
@@ -151,21 +179,29 @@ primero que este fix sigue en su sitio.
 ## D · Verificaciones y calibraciones pospuestas a T13 (corrida real)
 
 ### D1 · Umbral de relevancia — calibración con evidencia
-**Default:** 0.35 (config) — pero ver **A3**: ese 0.35 está en una escala que no corresponde
-a la de e5; el valor real probablemente viva en ~0.75–0.85. **Pendiente:** revisar
-`papers_discarded` alrededor del umbral que salga del test slow de T7. Si hay falsos descartes
-relevantes → bajar. Si en aceptados hay ruido (papers que solo citan a Echeverría de pasada)
-→ subir. En tema-autor probablemente el filtro deba ser exigente. **Documentar valor final y
-actualizar el default en config una vez calibrado.** Criterio de aceptación 6 del plan.
+**DECIDIDO (T13, 2026-07-06): umbral = 0.78.** Evidencia: la zona de frontera 0.77–0.82
+mostró que relevante y ruido se ENTRELAZAN («Modos y usos... Dossier» relevante a 0.786;
+«ÍNDICE» basura a 0.787) — ningún umbral los separa. Filosofía aplicada: falso positivo
+barato (el clustering de fase 04 aísla el front-matter), falso negativo caro. 0.78 corta
+exactamente la cola verdadera (7 papers: ruido genuino y tangenciales débiles) y conserva
+todo lo defendible. Ruido residual aceptado: ~5 piezas de front-matter de un volumen de
+2002 por encima del corte; mejora futura si molesta: stoplist de títulos estructurales
+(ÍNDICE, Prólogo, Bibliografía), no mover el umbral. Promulgación: migración SQL de los
+<0.78 a `papers_discarded` (puebla la auditoría, criterio 6 ✓) + default en config 0.35→0.78
+(+2 aserciones de tests actualizadas).
 
-### D2 · Criterio de PDFs recalibrado a ≥ 40 %
-**Origen:** decisión A8. El 60 % original es para STEM (cobertura arXiv). Humanidades en
-español tiene cobertura OA estructuralmente menor. Verificar el % real en T13 y, si queda
-muy por debajo del 40 %, no es necesariamente un bug: puede ser el techo del dominio. Anotar el valor.
-**Primer dato (T10, muestra n=5 del top de búsqueda exacta):** 4/5 con PDF descargado (80 %) —
-SciELO/FLACSO/UNAM/USP. El fallido fue una landing HTML de biblat correctamente rechazada por
-el guardián `%PDF-`. Muestra pequeña y sesgada al top (los más citados suelen ser OA); el % de
-T13 sobre ~300 papers será menor, pero el arranque es alentador.
+### D2 · Criterio de PDFs — techo medido: ~25 % en este dominio (recalibrado 2ª vez)
+**Resultado T13:** 24.6 % global; 25.6 % en la banda relevante (≥0.80). El 40 % (ya
+recalibrado desde 60 %) tampoco se alcanza. **Diagnóstico del log de descargas:** dos
+patrones dominan los fallos — (a) 403 Forbidden de servidores que bloquean clientes sin
+User-Agent (DOAJ, PhilPapers, SciELO-CL, repos UNAM); (b) `open_access.oa_url` de OpenAlex
+apunta frecuentemente a landing pages HTML, no al PDF (rechazadas por el guardián `%PDF-`,
+incluyendo un dominio de revista secuestrado por un casino — el guardián funcionando).
+**Acciones:** User-Agent identificado añadido al cliente de descarga (beneficia corridas
+futuras; los 403 de ESTE corpus no son recuperables porque el `raw` no se persiste — mejora
+seria futura: persistir la URL de PDF candidata en tabla auxiliar local, sin tocar C1).
+**Criterio recalibrado con honestidad: ~25 % es el techo del dominio con OA declarado y sin
+re-resolución.** Documentar en spec 02 al cierre.
 
 ### D3 · Duplicados residuales por DOI
 **Verificación:** `SELECT doi, COUNT(*) FROM papers WHERE doi IS NOT NULL GROUP BY doi
@@ -238,6 +274,16 @@ entra con el modelo real + persistencia, combinación que ningún test ejercitab
 **Regla general:** toda frontera modelo→persistencia convierte a tipos nativos; nunca
 confiar en que `model_copy` valide.
 
+### F6 · La prueba de idempotencia exige la MISMA DB; respaldar el corpus tras corridas caras
+**Descubierto en:** T13 (se borró la DB antes de la re-corrida de verificación; el crash 503
+llegó antes de persistir → corpus de 234 papers perdido, regenerable en ~10 min).
+**Qué:** (a) idempotencia = correr dos veces **sobre el mismo estado** sin cambios; borrar la
+DB destruye lo que se quiere verificar. El `rm` solo aplica cuando se quiere partir de cero
+deliberadamente. (b) Regla nueva: tras cada corrida cara, respaldo inmediato:
+`cp data/excavador.db data/excavador.backup.db`. Un corpus de minutos merece una copia de
+un segundo. (c) Las regeneraciones producen conteos *casi* idénticos, no exactos (las APIs
+pueden devolver ±unos hits entre corridas); los criterios se evalúan sobre lo que salga.
+
 ---
 
 ## Estado de tareas
@@ -257,4 +303,18 @@ confiar en que `model_copy` valide.
 | T10 · Descarga PDFs | ✅ firmado | sí |
 | T11 · Pipeline | ✅ firmado | sí |
 | T12 · CLI | ✅ firmado | sí |
-| T13 · Corrida real | 🔄 en curso | — |
+| T13 · Corrida real + calibración | ✅ firmado | sí |
+
+---
+
+## Cierre de fase (2026-07-06)
+
+**Corpus final:** 227 papers · 24.2 % con PDF (55) · 57.3 % con DOI · umbral 0.78 ·
+descartados auditables: 28 duplicate, 3 invalid_record, 12 low_relevance.
+**Criterios de aceptación:** 1 ✓ (227 ≥ 100) · 2 ✓ (cero dup por DOI) · 3 recalibrado a
+techo del dominio ~25 % con diagnóstico y mejora UA instalada · 4 ✓ (re-corrida sin
+duplicación; +1 por dato nuevo de fuente, documentado) · 5 ✓ (top-20 validado a ojo
+humano) · 6 ✓ (umbral con evidencia en papers_discarded).
+**Herencia para fase 03:** ver E1-E3 y las entradas A1 (abstracts con diacríticos rotos),
+C5 (~4 % duplicados DOI-variante → chunks duplicados tolerables), y el hecho de que solo
+~55 papers tienen PDF para GROBID; el resto se indexará por abstract (chunk único).

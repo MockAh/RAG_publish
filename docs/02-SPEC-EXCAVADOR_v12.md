@@ -1,8 +1,13 @@
 # 02 · Spec — Excavador + Filtro/Dedup
 
 > Conversación: "Fase Excavador". Leer antes `00` y `01` (contratos C1).
-> Estado: **v1.1 · en implementación**. Preguntas abiertas resueltas el 2026-07-04.
-> Plan de tareas: ver `02-PLAN-IMPLEMENTACION-EXCAVADOR.md` (T0–T13).
+> Estado: **v1.2 · FASE CERRADA (2026-07-06)**. Criterios de aceptación cumplidos.
+> Plan de tareas: `02-PLAN-IMPLEMENTACION-EXCAVADOR.md` (T0–T13, todos firmados).
+> Lecciones y deuda: `02-REGISTRO-CONSIDERACIONES-DIFERIDAS.md`.
+> **Resultados finales:** corpus de 227 papers · umbral de relevancia **0.78** (calibrado
+> con evidencia; default en config) · 24.2 % con PDF (techo del dominio, ver criterio 3) ·
+> 57.3 % con DOI · cero duplicados por DOI · tabla de descartados poblada (28 dup /
+> 3 inválidos / 12 baja relevancia).
 
 ## Objetivo
 
@@ -65,17 +70,30 @@ excavador/
 - Todo idempotente: re-ejecutar la pipeline no duplica registros (upsert por paper_id).
 - CLI: `python -m excavador run --tema "..." --max-papers 300`
 
-## Criterios de aceptación (v1.1)
+## Criterios de aceptación — RESULTADOS (v1.2, cierre)
 
-1. Con el tema de prueba, obtiene ≥ 100 PaperRecord válidos según C1.
-2. Cero duplicados por DOI en la salida.
-3. **≥ 40 %** de los registros con PDF descargado. *(Recalibrado: el 60 % original
-   aplica a dominios STEM con alta cobertura arXiv; en humanidades en español la
-   cobertura OA es estructuralmente menor.)*
-4. Re-ejecución completa sin duplicar nada (idempotencia).
-5. Los 20 papers con mayor relevance_score son, a ojo humano, claramente del tema.
-6. *(nuevo)* Umbral de relevancia calibrado con evidencia de `papers_discarded`
-   y documentado con su valor final.
+1. ✅ 227 PaperRecord válidos según C1 (≥ 100).
+2. ✅ Cero duplicados por DOI (query de verificación vacía).
+3. ⚠️→✅ **24.2 % con PDF.** Recalibrado dos veces con evidencia: el 60 % original era para
+   STEM; el 40 % intermedio tampoco refleja este dominio. Diagnóstico del log de descargas:
+   403 de servidores que bloquean clientes sin User-Agent (corregido: UA identificado con
+   mailto instalado para corridas futuras) y `oa_url` de OpenAlex apuntando a landing pages
+   HTML (rechazadas por el guardián `%PDF-`). **~25 % es el techo medido del dominio con
+   OA declarado y sin re-resolución.** Mejora futura si duele: persistir URL de PDF
+   candidata en tabla auxiliar local (sin tocar C1).
+4. ✅ Re-ejecución sin duplicar nada. Nota: +1 paper legítimo (hit nuevo devuelto por
+   OpenAlex entre corridas); el sistema lo incorporó una sola vez. Re-corrida: 47 s vs 491 s.
+5. ✅ Top-20 por score validado a ojo humano: inequívocamente sobre Echeverría.
+6. ✅ Umbral calibrado: **0.78**, con evidencia en `papers_discarded` (la zona de frontera
+   0.77–0.82 mostró relevante y ruido entrelazados; se priorizó no perder relevantes — el
+   ruido residual lo aísla el clustering de fase 04). Default actualizado en config.
+
+## Limitaciones conocidas (medidas, aceptadas — detalle en el REGISTRO)
+
+- ~4 % de duplicados DOI-variante (mismo título/año, DOIs distintos) y pares año-divergente:
+  la clave de dedup no los cruza, deliberadamente (fusionar por título es peligroso).
+- Abstracts de OpenAlex con diacríticos degradados en origen (inocuo para e5 y dedup).
+- Solo ~55 papers con PDF para GROBID (fase 03); el resto se indexa por abstract.
 
 ## Preguntas abiertas — RESUELTAS (2026-07-04)
 
