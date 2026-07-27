@@ -153,6 +153,7 @@ def chunk_sections(
     embedding_model: str,
     min_tokens: int = 200,
     max_tokens: int = 500,
+    tail_min_tokens: int = 100,
     counter: Callable[[str], int] | None = None,
 ) -> list[Chunk]:
     """Trocea `sections` en `Chunk`s citables, sin cruzar secciones ni partir oraciones.
@@ -161,9 +162,17 @@ def chunk_sections(
     `min_tokens` y cierra el chunk antes de rebasar `max_tokens`; el último
     chunk de una sección puede quedar por debajo de `min_tokens`. Si una sola
     oración excede `max_tokens`, se emite como chunk propio (con warning) en
-    vez de partirla. `seq` es un contador global del documento (no se reinicia
-    por sección), para que `chunk_id` sea único incluso con secciones
-    homónimas (fallback plano P5, todas llamadas "body").
+    vez de partirla.
+
+    Tras trocear una sección, si su último chunk queda por debajo de
+    `tail_min_tokens` y existe un chunk anterior en esa misma sección, ambos
+    se fusionan en uno solo (rebanando `full_text[previo.char_start:cola.char_end]`,
+    nunca concatenando), siempre que la suma no rebase `max_tokens`; si la
+    rebasaría, la cola se conserva como chunk propio. `seq` es un contador
+    global del documento (no se reinicia por sección ni se ve afectado por las
+    fusiones: se renumera al final para quedar consecutivo y sin huecos), para
+    que `chunk_id` sea único incluso con secciones homónimas (fallback plano
+    P5, todas llamadas "body").
     """
     chunks: list[Chunk] = []
     seq = 0
@@ -178,6 +187,7 @@ def chunk_sections(
             )
             continue
 
+        section_start_idx = len(chunks)
         sentence_spans = split_sentences(section.text)
         abs_spans = [(section.char_start + s, section.char_start + e) for s, e in sentence_spans]
 
@@ -252,5 +262,30 @@ def chunk_sections(
                 )
             )
             seq += 1
+
+        if len(chunks) - section_start_idx >= 2:
+            tail_chunk = chunks[-1]
+            prev_chunk = chunks[-2]
+            if count_tokens(tail_chunk.text, counter) < tail_min_tokens:
+                merged_tokens = count_tokens(
+                    full_text[prev_chunk.char_start : tail_chunk.char_end], counter
+                )
+                if merged_tokens <= max_tokens:
+                    chunks[-2:] = [
+                        _build_chunk(
+                            paper_id,
+                            section.section,
+                            0,
+                            prev_chunk.char_start,
+                            tail_chunk.char_end,
+                            full_text,
+                            embedding_model,
+                        )
+                    ]
+
+    for i, chunk in enumerate(chunks):
+        expected_id = Chunk.build_id(paper_id, chunk.section, i)
+        if chunk.chunk_id != expected_id:
+            chunks[i] = chunk.model_copy(update={"chunk_id": expected_id})
 
     return chunks

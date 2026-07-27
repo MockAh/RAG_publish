@@ -1,5 +1,6 @@
 """Tests para biblioteca.chunker."""
 
+import itertools
 import unicodedata
 from pathlib import Path
 
@@ -184,6 +185,126 @@ def test_chunk_ids_unicos_con_secciones_de_nombre_repetido() -> None:
     assert len(ids) == len(set(ids))
     for chunk in chunks:
         assert full_text[chunk.char_start : chunk.char_end] == chunk.text
+
+
+# --- fusión de cola corta (tail_min_tokens) --------------------------------
+
+
+def _make_sentence(token_count: int, start_word: str) -> str:
+    """Construye una oración de `token_count` tokens (para `_word_counter`), en mayúscula inicial."""
+    words = [start_word] + [f"w{i}" for i in range(token_count - 1)]
+    return " ".join(words) + "."
+
+
+def test_ningun_chunk_bajo_tail_min_tokens_fixture_real() -> None:
+    doc = parse_document(FIXTURE)
+    chunks = chunk_sections(doc.sections, doc.full_text, "paper1", "e5-model", counter=_word_counter)
+
+    for _, group in itertools.groupby(chunks, key=lambda c: c.section):
+        section_chunks = list(group)
+        last = section_chunks[-1]
+        last_tokens = count_tokens(last.text, counter=_word_counter)
+        if last_tokens >= 100 or len(section_chunks) == 1:
+            continue
+        prev = section_chunks[-2]
+        merged_tokens = count_tokens(doc.full_text[prev.char_start : last.char_end], counter=_word_counter)
+        assert merged_tokens > 500
+
+
+def test_fusion_respeta_invariante_texto_rebanado() -> None:
+    s1 = _make_sentence(15, "Palabra")
+    s2 = _make_sentence(15, "Segunda")
+    s3 = _make_sentence(8, "Tercera")
+    section_text = f"{s1} {s2} {s3}"
+    sections = [SectionText(section="body", text=section_text, char_start=0, char_end=len(section_text))]
+
+    chunks = chunk_sections(
+        sections,
+        section_text,
+        "paper1",
+        "e5-model",
+        min_tokens=20,
+        max_tokens=50,
+        tail_min_tokens=10,
+        counter=_word_counter,
+    )
+
+    assert len(chunks) == 1
+    chunk = chunks[0]
+    assert count_tokens(chunk.text, counter=_word_counter) == 38
+    assert section_text[chunk.char_start : chunk.char_end] == chunk.text
+    assert chunk.text == section_text
+
+
+def test_seq_consecutivos_y_unicos_tras_fusion() -> None:
+    s1 = _make_sentence(15, "Palabra")
+    s2 = _make_sentence(15, "Segunda")
+    s3 = _make_sentence(8, "Tercera")
+    section1_text = f"{s1} {s2} {s3}"
+
+    s4 = _make_sentence(25, "Alpha")
+    s5 = _make_sentence(25, "Beta")
+    s6 = _make_sentence(15, "Gamma")
+    section2_text = f"{s4} {s5} {s6}"
+
+    full_text = f"{section1_text} {section2_text}"
+    section1_end = len(section1_text)
+    section2_start = section1_end + 1
+    sections = [
+        SectionText(section="intro", text=section1_text, char_start=0, char_end=section1_end),
+        SectionText(
+            section="cuerpo",
+            text=section2_text,
+            char_start=section2_start,
+            char_end=section2_start + len(section2_text),
+        ),
+    ]
+
+    chunks = chunk_sections(
+        sections,
+        full_text,
+        "paper1",
+        "e5-model",
+        min_tokens=20,
+        max_tokens=50,
+        tail_min_tokens=10,
+        counter=_word_counter,
+    )
+
+    assert len(chunks) == 3
+    assert [c.section for c in chunks] == ["intro", "cuerpo", "cuerpo"]
+
+    seqs = [int(c.chunk_id.rsplit("#", 1)[1]) for c in chunks]
+    assert seqs == list(range(len(chunks)))
+    assert len({c.chunk_id for c in chunks}) == len(chunks)
+    for chunk in chunks:
+        assert full_text[chunk.char_start : chunk.char_end] == chunk.text
+
+
+def test_fusion_no_ocurre_si_excede_max_tokens() -> None:
+    s1 = _make_sentence(24, "Palabra")
+    s2 = _make_sentence(24, "Segunda")
+    s3 = _make_sentence(5, "Tercera")
+    section_text = f"{s1} {s2} {s3}"
+    sections = [SectionText(section="body", text=section_text, char_start=0, char_end=len(section_text))]
+
+    chunks = chunk_sections(
+        sections,
+        section_text,
+        "paper1",
+        "e5-model",
+        min_tokens=20,
+        max_tokens=50,
+        tail_min_tokens=10,
+        counter=_word_counter,
+    )
+
+    assert len(chunks) == 2
+    assert count_tokens(chunks[0].text, counter=_word_counter) == 48
+    tail = chunks[1]
+    assert count_tokens(tail.text, counter=_word_counter) == 5
+    assert tail.text == f" {s3}"
+    assert section_text[tail.char_start : tail.char_end] == tail.text
 
 
 @pytest.mark.slow
