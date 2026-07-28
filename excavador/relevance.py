@@ -14,6 +14,7 @@ rango útil estrecho (~0.6-1.0 en la práctica). El umbral de aceptación se
 calibra empíricamente en T13, no aquí.
 """
 
+from biblioteca.embedder import Embedder
 from excavador.models import PaperRecord
 
 
@@ -50,19 +51,19 @@ class RelevanceScorer:
         """Asigna `relevance_score` (coseno recortado a [0,1]) a copias de `records`.
 
         Embebe `topic` una sola vez con prefijo "query: " y todos los
-        `records` en un único batch con prefijo "passage: ". No muta los
-        records originales.
+        `records` en un único batch con prefijo "passage: " (vía `Embedder`).
+        No muta los records originales.
         """
-        encoder = self._get_encoder()
-        query_vector = encoder.encode(f"query: {topic}")
+        embedder = Embedder(self.model_name, encoder=self._get_encoder())
+        query_vector = embedder.embed_query(topic)
 
-        passages = [f"passage: {record.title}. {record.abstract}" for record in records]
-        passage_vectors = encoder.encode(passages)
+        passages = [f"{record.title}. {record.abstract}" for record in records]
+        passage_vectors = embedder.embed_passages(passages)
 
         scored_records = []
         for record, vector in zip(records, passage_vectors):
             cosine = _cosine_similarity(query_vector, vector)
-            clipped = float(max(0.0, min(1.0, cosine)))  # np.float32 -> float nativo; model_copy NO valida
+            clipped = float(max(0.0, min(1.0, cosine)))  # float nativo (F5); Embedder ya convirtió los vectores
             scored_records.append(record.model_copy(update={"relevance_score": clipped}))
         return scored_records
 
