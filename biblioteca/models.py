@@ -35,6 +35,14 @@ class Chunk(BaseModel):
         return f"{paper_id}#{section}#{seq}"
 
 
+class ScoredChunk(BaseModel):
+    """Resultado de `ChunkStore.retrieve`: un `Chunk` con su score de similitud."""
+
+    chunk: Chunk
+    score: float  # similitud coseno en [0, 1]; Chroma devuelve distancia, se convierte con `1 - distancia`
+    from_abstract: bool
+
+
 class SectionText(BaseModel):
     """Sección extraída del TEI antes de trocear (modelo interno, no es contrato)."""
 
@@ -42,6 +50,14 @@ class SectionText(BaseModel):
     text: str
     char_start: int
     char_end: int
+
+
+class ParsedDocument(BaseModel):
+    """Documento TEI ya parseado: texto completo y sus secciones (modelo interno, no es contrato)."""
+
+    full_text: str
+    sections: list[SectionText]
+    used_flat_fallback: bool
 
 
 class IndexStats(BaseModel):

@@ -16,10 +16,13 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
 
 import chromadb
 
-from biblioteca.models import Chunk
+from biblioteca.config import Settings
+from biblioteca.embedder import Embedder, get_embedder
+from biblioteca.models import Chunk, ScoredChunk
 
 logger = logging.getLogger(__name__)
 
@@ -80,17 +83,60 @@ class ChunkStore:
         ids = result["ids"]
         if not ids:
             return None
-        metadata = result["metadatas"][0]
-        text = result["documents"][0]
-        return Chunk(
-            chunk_id=ids[0],
-            paper_id=metadata["paper_id"],
-            section=metadata["section"],
-            text=text,
-            char_start=metadata["char_start"],
-            char_end=metadata["char_end"],
-            embedding_model=metadata["embedding_model"],
-        )
+        return _build_chunk(ids[0], result["documents"][0], result["metadatas"][0])
+
+    def retrieve(
+        self,
+        query: str,
+        top_k: int = 8,
+        filter_paper_ids: list[str] | None = None,
+        filter_sections: list[str] | None = None,
+        embedder: Embedder | None = None,
+    ) -> list[ScoredChunk]:
+        """Busca los `top_k` chunks más similares a `query` (similitud coseno).
+
+        Embebe `query` con `embed_query` (antepone "query: ", parámetro
+        global congelado del contrato 01: sin él los espacios vectoriales de
+        consulta y documento no son comparables). Si `embedder` es None usa
+        `get_embedder` con el modelo de `Settings`. `filter_paper_ids` y
+        `filter_sections` se traducen a la cláusula `where` de Chroma
+        (combinados con `$and` si se dan ambos). Devuelve lista vacía (nunca
+        excepción) si la colección está vacía o ningún punto pasa los filtros.
+        """
+        if self._collection.count() == 0:
+            return []
+
+        if embedder is None:
+            embedder = get_embedder(Settings().embedding_model)
+        query_embedding = embedder.embed_query(query)
+
+        where = _build_where(filter_paper_ids, filter_sections)
+        query_kwargs: dict[str, Any] = {
+            "query_embeddings": [query_embedding],
+            "n_results": top_k,
+            "include": ["documents", "metadatas", "distances"],
+        }
+        if where is not None:
+            query_kwargs["where"] = where
+
+        result = self._collection.query(**query_kwargs)
+
+        ids = result["ids"][0]
+        if not ids:
+            return []
+
+        scored = [
+            ScoredChunk(
+                chunk=_build_chunk(chunk_id, text, metadata),
+                score=1.0 - distance,  # Chroma devuelve distancia, no similitud
+                from_abstract=bool(metadata["from_abstract"]),
+            )
+            for chunk_id, text, metadata, distance in zip(
+                ids, result["documents"][0], result["metadatas"][0], result["distances"][0]
+            )
+        ]
+        scored.sort(key=lambda scored_chunk: scored_chunk.score, reverse=True)
+        return scored
 
     def count(self) -> int:
         """Número total de chunks almacenados."""
@@ -110,3 +156,33 @@ class ChunkStore:
         self._collection.delete(ids=ids)
         logger.info("delete_paper: %d chunks borrados de %s", len(ids), paper_id)
         return len(ids)
+
+
+def _build_chunk(chunk_id: str, text: str, metadata: dict[str, Any]) -> Chunk:
+    """Reconstruye un `Chunk` completo a partir de documento + metadata de Chroma."""
+    return Chunk(
+        chunk_id=chunk_id,
+        paper_id=metadata["paper_id"],
+        section=metadata["section"],
+        text=text,
+        char_start=metadata["char_start"],
+        char_end=metadata["char_end"],
+        embedding_model=metadata["embedding_model"],
+    )
+
+
+def _build_where(
+    filter_paper_ids: list[str] | None, filter_sections: list[str] | None
+) -> dict[str, Any] | None:
+    """Traduce los filtros de `retrieve` a la cláusula `where` de Chroma."""
+    clauses: list[dict[str, Any]] = []
+    if filter_paper_ids:
+        clauses.append({"paper_id": {"$in": filter_paper_ids}})
+    if filter_sections:
+        clauses.append({"section": {"$in": filter_sections}})
+    if not clauses:
+        return None
+    if len(clauses) == 1:
+        return clauses[0]
+    return {"$and": clauses}
+
