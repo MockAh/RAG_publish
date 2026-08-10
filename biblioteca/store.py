@@ -85,6 +85,22 @@ class ChunkStore:
             return None
         return _build_chunk(ids[0], result["documents"][0], result["metadatas"][0])
 
+    def get_chunk_full(self, chunk_id: str) -> tuple[Chunk, bool] | None:
+        """Como `get_chunk` pero además devuelve `from_abstract` (P6), para auditoría manual (CLI `get`)."""
+        result = self._collection.get(ids=[chunk_id], include=["documents", "metadatas"])
+        ids = result["ids"]
+        if not ids:
+            return None
+        metadata = result["metadatas"][0]
+        chunk = _build_chunk(ids[0], result["documents"][0], metadata)
+        return chunk, bool(metadata["from_abstract"])
+
+    def all_metadata(self) -> list[dict[str, Any]]:
+        """Devuelve el metadata crudo (incluye `paper_id` y `from_abstract`) de todos los chunks (CLI `stats`)."""
+        if self._collection.count() == 0:
+            return []
+        return self._collection.get(include=["metadatas"])["metadatas"]
+
     def retrieve(
         self,
         query: str,

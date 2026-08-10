@@ -45,3 +45,13 @@ def test_settings_overrides_from_env(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     assert settings.embedding_model == "otro/modelo"
     assert settings.chunk_min_tokens == 100
     assert settings.chunk_max_tokens == 400
+
+
+def test_settings_ignores_foreign_env_vars_from_real_dotenv(tmp_path: Path) -> None:
+    """Regresión: un `.env` con variables `EXCAVADOR_*` ajenas no debe romper `Settings` (sin chdir)."""
+    env_file = tmp_path / ".env"
+    env_file.write_text("EXCAVADOR_OPENALEX_MAILTO=x@y.z\nBIBLIOTECA_CHROMA_DIR=/tmp/foo\n")
+
+    settings = Settings(_env_file=env_file)
+
+    assert settings.chroma_dir == Path("/tmp/foo")
