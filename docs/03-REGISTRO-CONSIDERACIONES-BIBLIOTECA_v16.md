@@ -2,7 +2,7 @@
 
 > Compañero del plan de micro-tareas (`03-PLAN-MICROTAREAS-BIBLIOTECA.md`).
 > Recoge hallazgos, deuda aceptada y herencias entre micro-tareas.
-> Estado: **vivo** · fase 03 en curso desde 2026-07-20 · última actualización 2026-07-28 (M8).
+> Estado: **vivo** · fase 03 en curso desde 2026-07-20 · última actualización 2026-08-13 (M15).
 
 ---
 
@@ -103,6 +103,56 @@ tokens); el de 55 es pobre como unidad citable. **Aplicado en M7:** parámetro
 suma no rebasa `max_tokens`, rebanando `full_text` (nunca concatenando) y renumerando `seq`.
 **Lo que NO se tocó:** el tamaño objetivo. Ver D2.
 
+### A10 · 67 papers (29,5 %) no tienen NADA citable — el corpus indexable es 160, no 227
+**Descubierto en:** M13 (prueba manual de la CLI: 2 de los 3 primeros papers se omitieron).
+**Medido en SQLite:** 227 totales · **70 sin abstract** · **67 sin abstract Y sin PDF**.
+**Qué significa:** esos 67 son registros con metadatos válidos (título, autores, año, DOI)
+que OpenAlex nunca acompañó de abstract — patrón conocido de revistas latinoamericanas y de
+libros. No es un fallo del Excavador ni de la Biblioteca: simplemente **no se pueden citar**,
+porque D5 del contrato exige que toda cita apunte a un `chunk_id` real.
+**Corpus real de la Biblioteca:** 160 papers indexables = 55 con PDF (~38 chunks c/u) +
+105 solo abstract (1 chunk c/u) → **proyección ≈ 2 200 chunks**, coherente con A9.
+**Siguen siendo útiles:** como referencias bibliográficas y para el snowballing de futuras
+ingestas. Lo que no pueden es sustentar afirmaciones.
+**PROPAGAR:** fase 04 clusteriza sobre 160 papers, no 227. Fase 05 debe saber que ~30 % del
+corpus no sustenta nada (ver E3).
+
+### A11 · `Settings()` reventaba fuera de los tests — el aislamiento escondía el bug
+**Descubierto en:** M13 (primera ejecución real de la CLI desde la raíz del repo).
+**Qué:** el `.env` del repo trae variables `EXCAVADOR_*`; pydantic-settings lee el archivo
+entero y, sin `extra="ignore"`, las trata como campos prohibidos → `ValidationError` en
+CUALQUIER comando de la CLI. **Fix:** `extra="ignore"` en el `SettingsConfigDict`.
+**Por qué 181 tests no lo atraparon:** todos hacen `monkeypatch.chdir(tmp_path)` (regla F4 de
+fase 02) y por tanto nunca ven el `.env` real. **El aislamiento que protege los tests es lo que
+ocultaba el fallo del entorno real.** Mismo patrón que F5 de fase 02 (numpy→SQLite): el bug vive
+en una combinación que ningún test ejercita.
+**Regla nueva:** todo módulo con CLI se prueba UNA vez a mano desde la raíz del repo antes de
+firmarse. El test de regresión añadido pasa un `.env` con claves ajenas vía `_env_file`.
+**Higiene:** el traceback imprimió la API key de S2 completa (F4 de fase 02 avisaba). Rotada.
+
+### A12 · GROBID: 55/55 sin un solo fallo, en 2.2 minutos
+**Descubierto en:** M14 (corrida real, tras el ajuste de RAM a 8 GB).
+**Números:** 55 PDFs, `ok=55 fail=0`, 130 s totales (~2.4 s por PDF).
+**Criterio 1 de la spec (≥ 95 %): cumplido al 100 %.** D3 cerrada.
+**Lecturas:** (a) la estimación previa de 20–50 min estaba muy por encima: el modelo CRF es
+mucho más rápido de lo previsto y no hubo presión de memoria; (b) ningún PDF del corpus
+resultó corrupto o ilegible, así que la ruta de fallback a abstract por `GrobidError`
+(implementada en M12) no se ejercitó con datos reales — sigue cubierta solo por tests.
+**Nota:** `data/tei/` contiene 56 archivos, no 55: sobra `prueba.tei.xml` de M2.
+
+### A13 · El único libro con PDF se parseó bien: el fallback P5 no hizo falta
+**Descubierto en:** M15. **Composición del corpus:** 191 `article` (54 con PDF), 20
+`book-chapter` (1 con PDF), 6 `thesis`, 5 `book`, 5 `other` — **ninguno de estos últimos
+con PDF**. Solo existe UN caso real de libro/capítulo parseable.
+**Resultado sobre ese caso** (`doi:10.47377/iluminacionesprofanas.11`): 4 secciones con
+títulos temáticos reales, 48 947 caracteres, `used_flat_fallback=False` — y correctamente,
+porque GROBID no se equivocó.
+**Confirmación lateral:** una de las secciones se llama "Obras citadas" (redacción distinta a
+"Bibliografía" del primer paper) y la stoplist P7 ya la cubría. Segundo documento, segunda
+variante, misma lista.
+**Consecuencia para A7:** secciones de 21 279 y 24 547 caracteres → ~23 chunks compartiendo
+etiqueta. El patrón de A7 amplificado, esperable en capítulos de libro. No es fallo.
+
 ## B · Deuda técnica aceptada
 
 ### B1 · `parse_tei` fue refactorizado por dentro en M6 (módulo ya firmado)
@@ -137,6 +187,10 @@ dos veces por corrida; la suite slow bajó de ~117 s a ~27 s.
   **Límite conocido del disparador (M6):** el fallback plano se activa con ≤1 sección útil
   Y >20 000 caracteres. Un libro que GROBID parta en 3 secciones inútiles y enormes NO lo
   activaría. No se corrige a ciegas: M15 mira libros reales y ajusta el umbral con evidencia.
+  **CERRADA (M15, 2026-08-13):** el umbral NO necesita ajuste. Salvedad honesta: solo existía
+  **un** caso real (A13) y no activó el fallback. El fallback queda escrito y cubierto por
+  tests sintéticos, pero **sin caso real que lo haya ejercitado**. Reabrir si entran libros
+  con PDF en una ingesta futura.
 - **D2 (→M17):** ¿overlap de chunks? Decidir con las 10 preguntas de prueba.
   **Ampliado en M7:** el overlap y el **tamaño objetivo** son la misma pregunta — cuánta
   ventana necesita el retrieval para que un pasaje sustente una afirmación completa — y se
@@ -144,7 +198,7 @@ dos veces por corrida; la suite slow bajó de ~117 s a ~27 s.
   real 200–280 tokens, ~2 500 chunks proyectados. Si el top-3 falla, las dos palancas son
   subir `min_tokens` (chunks más largos, menos fronteras) y activar overlap; probar en ese
   orden, porque la primera no duplica almacenamiento y la segunda sí.
-- **D3 (→M14):** tasa real de fallo de GROBID sobre los 55 PDFs (criterio 1: ≥ 95 %).
+- **D3 (→M14):** ~~tasa real de fallo de GROBID~~ **CERRADA (M14, 2026-08-13): 55/55, 0 fallos. Criterio 1 ✓ al 100 %.** Ver A12.
 - **D4 (→M16):** `get_chunk` reconstruye texto exacto (criterio 4, requisito del Verificador).
 - **D5 (→M16):** **muestreo de fidelidad de transcripción.** Leer 5 chunks al azar contra
   su PDF original. No hay detección automática de una página mal transcrita por GROBID; las
@@ -160,6 +214,11 @@ dos veces por corrida; la suite slow bajó de ~117 s a ~27 s.
 - **E1 (→05):** chunks con `from_abstract=True` son texto tipográficamente degradado
   (diacríticos rotos, A1 de fase 02). El Verificador debe saberlo (por eso P6).
 - **E2 (→04):** ~4 % de chunks duplicados esperables (C5 de fase 02, DOI-variantes).
+- **E3 (→04 y 05):** **el corpus citable son 160 papers, no 227** (A10). El clustering de
+  fase 04 debe partir de los papers efectivamente indexados, no de la tabla `papers` completa;
+  y fase 05 debe asumir que ~30 % del corpus recuperado no puede sustentar ninguna afirmación.
+  De esos 160, además, 105 aportan un solo chunk de abstract (`from_abstract=True`, texto
+  degradado por A1 de fase 02): el peso real del corpus verificable está en los 55 con PDF.
 
 ## F · Higiene de proceso
 
@@ -195,6 +254,18 @@ dos veces por corrida; la suite slow bajó de ~117 s a ~27 s.
   asfixiar a Windows (regla práctica: no más del 60–70 % de la RAM física).
   **Mitigación complementaria si el ajuste no alcanza:** embeber por lotes pequeños en M16
   (batch de 16–32 chunks) y procesar los PDFs de M14 en dos tandas.
+  **APLICADO (2026-08-13, antes de M14):** `.wslconfig` con `memory=8GB` + `swap=4GB` sobre
+  una máquina de 12 GB físicos. `free -h` pasó de 5.7 GB / 4.5 disponibles a **7.8 GB / 7.3
+  disponibles**. M14 corrió sin presión de memoria (A12). El batch de 32 de M12 se mantiene
+  como mitigación de segundo nivel para M16.
+  **Detalle operativo:** tras `wsl --shutdown` hay que reabrir Docker Desktop Y una terminal
+  WSL nueva — la integración `docker` se inyecta al iniciar la sesión; una terminal preexistente
+  no la ve y responde "command could not be found".
+
+- **F5 · Trabajar siempre desde `~/WandaVision/RAG_publish`, nunca desde `/mnt/c/...`.**
+  El sistema de archivos de Windows montado en WSL (drvfs) es notablemente más lento; la carga
+  del modelo e5 ya lo sufrió en fase 02 (A4 de aquel registro). Tras editar el `.wslconfig` es
+  fácil quedarse en `/mnt/c/Users/<usuario>`: volver al proyecto antes de lanzar cualquier corrida.
 
 ---
 
@@ -211,4 +282,11 @@ dos veces por corrida; la suite slow bajó de ~117 s a ~27 s.
 | M6 | Offsets exactos + fallback plano | ✅ 2026-07-22 · 113 tests · invariante por construcción → P8 |
 | M7 | Splitter + chunker (P7, fusión de colas) | ✅ 2026-07-27 · 132 tests · hallazgo A9 → D2 ampliada |
 | M8 | Embedder e5 compartido | ✅ 2026-07-28 · 140 tests · `relevance.py` delega → B2 |
-| M9–M18 | — | pendientes |
+| M9 | Store Chroma (`upsert_chunks`, `get_chunk`) | ✅ 2026-07-29 · 148 tests · payload P6 |
+| M10 | `retrieve` con filtros | ✅ 2026-07-30 · 157 tests · `ScoredChunk`, score = 1 − distancia |
+| M11 | Ruta sin PDF (chunk de abstract) | ✅ 2026-07-31 · 165 tests |
+| M12 | Pipeline de indexación | ✅ 2026-08-03 · 173 tests · fallback a abstract si GROBID falla |
+| M13 | CLI (`index`, `query`, `stats`, `get`) | ✅ 2026-08-10 · 181 tests · hallazgos A10–A11 |
+| M14 | Corrida real GROBID (55 PDFs) | ✅ 2026-08-13 · 55/55, 0 fallos, 2.2 min → A12, D3 ✓ |
+| M15 | Inspección de libros | ✅ 2026-08-13 · 1 solo caso real, bien parseado → A13, D1 ✓ |
+| M16–M18 | — | pendientes |
