@@ -74,10 +74,21 @@ mal retrieval: ningún chunk suelto las contiene. **Es exactamente el trabajo de
 - **Bibliografías filtradas** (stoplist P7): ya no llegan chunks de "Bibliografía",
   "Obras citadas", "Referencias", etc.
 - **~4 % de chunks duplicados** por DOI-variantes heredados de fase 02 (C5 de aquel registro).
-- **Transcripción de GROBID:** no hay detección automática de una página mal leída. Defensas:
-  el `chunk_id` lleva el `paper_id`, así que del chunk se llega al PDF en un paso; y un pasaje
-  mal transcrito no sustenta la afirmación, así que sale `not_entailed` en vez de fallar en
-  silencio.
+### Fidelidad de transcripción — MEDIDA, no supuesta (muestreo de 10 chunks)
+
+| Veredicto | Tasa | Qué significa para el Verificador |
+|---|---|---|
+| Fiel | **70 %** | Sin problema |
+| Ruido incrustado | **20 %** | Nota al pie completa o mobiliario de página ("d o s s i e r", nombres de autores, pie de revista) insertado a mitad de oración. **No se pierde texto**: el contenido sigue ahí y es citable |
+| Roto | **10 %** | Texto perdido en el salto de página; la oración queda sin sujeto ni sentido |
+
+**Todos los defectos ocurren en el salto de página** — GROBID reconstruye mal el orden de
+lectura en maquetación latinoamericana (dos columnas + notas al pie + encabezados corridos).
+No se repara: GROBID es determinista, reprocesar da el mismo error.
+
+**Regla para el Verificador:** si un pasaje sale `not_entailed` y además **no tiene sentido
+gramatical**, la causa probable es transcripción, no cita falsa del Redactor. Del `chunk_id`
+se llega al PDF en un paso para comprobarlo. No castigar al Redactor por un chunk roto.
 
 ## 5 · Cobertura temática (evidencia de M17)
 
