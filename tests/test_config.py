@@ -35,8 +35,9 @@ def test_settings_missing_mailto_raises(
         Settings()
 
 
-def test_settings_overrides_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_settings_overrides_from_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Las variables de entorno sobreescriben sus defaults correspondientes."""
+    monkeypatch.chdir(tmp_path)  # cwd sin .env: no hereda config del repo
     monkeypatch.setenv("EXCAVADOR_OPENALEX_MAILTO", "otro@example.com")
     monkeypatch.setenv("EXCAVADOR_DB_PATH", "otra/ruta.db")
     monkeypatch.setenv("EXCAVADOR_PDF_DIR", "otra/pdfs")

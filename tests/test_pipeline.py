@@ -4,6 +4,8 @@ import sqlite3
 from pathlib import Path
 from unittest.mock import Mock
 
+import pytest
+
 from excavador.config import Settings
 from excavador.models import RawHit
 from excavador.pipeline import run
@@ -201,13 +203,16 @@ def _run(scenario: dict, max_papers: int):
     )
 
 
-def test_pipeline_counts_discarded_reasons_and_idempotent_rerun(tmp_path: Path) -> None:
+def test_pipeline_counts_discarded_reasons_and_idempotent_rerun(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Escenario de 12 hits iniciales (1 inválido, 2 duplicados, 7 bajo umbral, 2 seeds
     de alta relevancia) + 2 hits de snowball (1 duplicado de un aceptado, 1 nuevo válido).
 
     `max_papers` generoso (no trunca) para poder verificar la idempotencia real de una
     segunda corrida idéntica sin la interacción con el corte (ver `test_pipeline_respects_max_papers_cutoff`).
     """
+    monkeypatch.chdir(tmp_path)  # cwd sin .env: no hereda config del repo
     scenario = _build_scenario(tmp_path)
 
     stats = _run(scenario, max_papers=10)
@@ -249,8 +254,9 @@ def test_pipeline_counts_discarded_reasons_and_idempotent_rerun(tmp_path: Path) 
     assert stats_2.accepted == 0
 
 
-def test_pipeline_respects_max_papers_cutoff(tmp_path: Path) -> None:
+def test_pipeline_respects_max_papers_cutoff(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """El corte por `max_papers` se aplica ANTES de descargar, ordenando por score."""
+    monkeypatch.chdir(tmp_path)  # cwd sin .env: no hereda config del repo
     scenario = _build_scenario(tmp_path)
 
     stats = _run(scenario, max_papers=2)

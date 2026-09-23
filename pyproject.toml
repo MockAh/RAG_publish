@@ -16,6 +16,7 @@ dependencies = [
     "sentence-transformers",
     "chromadb",
     "lxml",
+    "google-genai",
 ]
 
 [project.optional-dependencies]
@@ -25,7 +26,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["excavador", "biblioteca"]
+packages = ["excavador", "biblioteca", "expertos"]
 
 [tool.pytest.ini_options]
 markers = [
