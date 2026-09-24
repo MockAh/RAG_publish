@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     db_path: Path = Path("data/excavador.db")
     chroma_dir: Path = Path("data/chroma")
     synthesis_dir: Path = Path("data/synthesis")
+    expert_vectors_path: Path = Path("data/expert_vectors.npz")
 
     @field_validator("gemini_api_key", "model_synthesis", "model_label", mode="before")
     @classmethod

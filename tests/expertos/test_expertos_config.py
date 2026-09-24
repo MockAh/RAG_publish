@@ -34,6 +34,7 @@ def test_settings_defaults_and_overrides(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert settings.db_path == Path("data/excavador.db")
     assert settings.chroma_dir == Path("data/chroma")
     assert settings.synthesis_dir == Path("data/synthesis")
+    assert settings.expert_vectors_path == Path("data/expert_vectors.npz")
 
 
 def test_model_label_strips_crlf_from_dotenv(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
