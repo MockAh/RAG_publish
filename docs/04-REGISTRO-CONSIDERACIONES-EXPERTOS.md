@@ -89,7 +89,7 @@ normalizado exacto, y llegaron indexadas dos veces a Chroma. La fase 04 las cola
 nivel de vector representativo (`DOI_ALIASES` + `canonicalize_paper_ids` en
 `expertos/vectors.py`; canónico = más chunks en Chroma, empate → primero alfabético)
 para no duplicar peso en el clustering.
-**Deuda (E7):** la duplicación persiste en `excavador.db` y en Chroma; corregirla en
+**Deuda (E3):** la duplicación persiste en `excavador.db` y en Chroma; corregirla en
 origen requiere reabrir fase 02/03 con causa documentada — no se hace en fase 04.
 **Consecuencia pendiente para fase 05:** un mismo paper podría aparecer citado con dos
 `chunk_id` de distinto `paper_id`; el Verificador o el Redactor deberían tratarlos como el
@@ -124,7 +124,7 @@ colisiona en la importación. Se resolvió renombrando a `test_expertos_config.p
   agnóstico de N1 (X8) ya lo hace posible sin tocar código de agentes.
 - **E2 (→05):** la tabla `llm_calls` es la base para responder la pregunta abierta de la
   spec 05 sobre presupuesto de llamadas por consulta.
-- **E7 (→02/03, deuda no urgente):** 3 papers indexados por duplicado (DOI-variante no
+- **E3 (→02/03, deuda no urgente):** 3 papers indexados por duplicado (DOI-variante no
   capturada por el dedup de fase 02). Colapsados en fase 04 a nivel de vector (A6);
   persisten como registros duplicados en `excavador.db` y `data/chroma`. Corregir si el
   volumen crece en una ingesta futura, o si aparecen más casos.

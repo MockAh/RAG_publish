@@ -11,8 +11,11 @@ Orquestador/Redactor/Verificador (05).
 
 ## Estado actual
 
-Fase 04 (paquete `expertos/`), micro-tarea **N2 en curso** (ver plan para N0–N14).
-N0 y N1 firmadas. Repo: `~/WandaVision/RAG_publish`, rama `main`, último commit `a4564b0`.
+Fase 04, micro-tarea N2 cerrada, N3 pendiente de iniciar. N0, N1, N2 firmadas (commit
+114d57a). 155 papers únicos en data/expert_vectors.npz (3 DOI-variante colapsados, ver
+A5/A6/E3 del registro). N3 (barrido de clustering) no ha empezado — pedir el prompt antes
+de escribir código.
+Repo: `~/WandaVision/RAG_publish`, rama `main` (ver plan para N0–N14).
 
 Paquetes previos, YA FIRMADOS, no modificar sin causa documentada (precedente en el
 registro de fase 02, sección B): `excavador/`, `biblioteca/`.
