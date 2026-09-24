@@ -63,14 +63,37 @@ abarata Q1 (re-clusterizar y regenerar síntesis a voluntad).
 AI Pro (requiere proyecto GCP con facturación y alta en el Google Developer Program), o
 reintentar `gemini-3.8-flash` cuando deje de dar 503.
 
-### A5 · Tres papers indexados sin abstract, resueltos por media de chunks re-normalizada
+### A5 · Tres papers sin abstract, resueltos por media de chunks re-normalizada
 **Descubierto en:** N2 (construcción de `data/expert_vectors.npz`).
-155/158 papers usan `título. abstract`; 3 (`doi:10.15174/rv.v17i33.756`,
+El corpus de N2 son los 158 papers indexados en Chroma, que tras colapsar los 3 alias de
+DOI de A6 quedan en **155 papers únicos = 155 vectores**. De ellos, 152 usan
+`título. abstract`; 3 (`doi:10.15174/rv.v17i33.756`,
 `doi:10.22201/cisan.24487228e.2009.01.37`, `doi:10.22201/ffyl.29544270e.2024.46.2092`)
 no tienen abstract en SQLite pese a estar indexados — se resuelven promediando los
 embeddings de sus chunks (re-obtenidos vía `retrieve`, no leídos del store) y
 renormalizando a norma 1, para no sesgar el clustering de N3 con vectores de menor
 magnitud.
+
+### A6 · Tres papers indexados dos veces por DOI-variante, colapsados en `vectors.py`
+**Descubierto en:** N2 (revisión de las claves de `expert_vectors.npz`).
+**Verificado (2026-09-23)** con `Storage.get_paper`: título, año y autores idénticos.
+
+| Alias (descartado) | Canónico | Chunks alias / canónico |
+|---|---|---|
+| `doi:10.15332/25005375/5376` | `doi:10.15332/25005375.5376` | 1 / 26 |
+| `doi:10.22201/ppla.24487988e.2016.6.58438` | `doi:10.22201/ppela.24487988e.2016.6.58438` | 1 / 1 (empate → alfabético) |
+| `doi:10.37819/revhuman.v9i2.866` | `doi:10.37819/humanrev.v9i2.866` | 1 / 44 |
+
+Son variantes de C5 (fase 02) que el dedup de esa fase no detectó, porque compara DOI
+normalizado exacto, y llegaron indexadas dos veces a Chroma. La fase 04 las colapsa a
+nivel de vector representativo (`DOI_ALIASES` + `canonicalize_paper_ids` en
+`expertos/vectors.py`; canónico = más chunks en Chroma, empate → primero alfabético)
+para no duplicar peso en el clustering.
+**Deuda (E7):** la duplicación persiste en `excavador.db` y en Chroma; corregirla en
+origen requiere reabrir fase 02/03 con causa documentada — no se hace en fase 04.
+**Consecuencia pendiente para fase 05:** un mismo paper podría aparecer citado con dos
+`chunk_id` de distinto `paper_id`; el Verificador o el Redactor deberían tratarlos como el
+mismo paper (`DOI_ALIASES` es la fuente) si vuelve a aparecer.
 
 ---
 
@@ -101,6 +124,10 @@ colisiona en la importación. Se resolvió renombrando a `test_expertos_config.p
   agnóstico de N1 (X8) ya lo hace posible sin tocar código de agentes.
 - **E2 (→05):** la tabla `llm_calls` es la base para responder la pregunta abierta de la
   spec 05 sobre presupuesto de llamadas por consulta.
+- **E7 (→02/03, deuda no urgente):** 3 papers indexados por duplicado (DOI-variante no
+  capturada por el dedup de fase 02). Colapsados en fase 04 a nivel de vector (A6);
+  persisten como registros duplicados en `excavador.db` y `data/chroma`. Corregir si el
+  volumen crece en una ingesta futura, o si aparecen más casos.
 
 ## F · Higiene de proceso
 
@@ -125,7 +152,7 @@ colisiona en la importación. Se resolvió renombrando a `test_expertos_config.p
 |---|---|---|
 | N0 | Decisiones Q1–Q3, X1–X8 | ✅ 2026-09-19 |
 | N1 | Bootstrap `expertos/` + cliente LLM | ✅ 2026-09-23 · commit a4564b0 · 194 tests · hallazgos A1–A4 |
-| N2 | Vectores representativos | ✅ 2026-09-23 · `data/expert_vectors.npz` = 158 vectores (1024-d, norma 1) · test slow OK · hallazgo A5 |
+| N2 | Vectores representativos | ✅ 2026-09-23 · `data/expert_vectors.npz` = 155 vectores (1024-d, norma 1; 158 indexados − 3 alias) · test slow OK · hallazgos A5–A6 |
 | N3 | Barrido de clustering | ⬜ |
 | N4 | Inspección humana; elegir k | ⬜ |
 | N5 | Etiquetado LLM | ⬜ |

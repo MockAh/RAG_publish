@@ -11,7 +11,9 @@ from biblioteca.embedder import Embedder
 from biblioteca.models import Chunk, ScoredChunk
 from excavador.models import PaperRecord
 from expertos.vectors import (
+    DOI_ALIASES,
     build_representative_vectors,
+    canonicalize_paper_ids,
     get_indexed_paper_ids,
     load_vectors,
     save_vectors,
@@ -152,6 +154,23 @@ def test_every_vector_uses_passage_prefix(encoder: FakeEncoder, embedder: Embedd
     assert not any(text.startswith("query: ") for text in encoder.calls)
 
 
+def test_doi_alias_pairs_collapse_to_one_entry(embedder: Embedder) -> None:
+    """Cada par alias/canónico de DOI_ALIASES produce un solo vector, con clave canónica (A6)."""
+    pairs = list(DOI_ALIASES.items())
+    assert len(pairs) == 3
+    paper_ids = sorted([pid for pair in pairs for pid in pair] + ["doi:10.1/a"])
+    papers = [_paper(pid) for pid in paper_ids]
+    store = DummyChunkStore({pid: ["x"] for pid in paper_ids})
+
+    assert canonicalize_paper_ids(paper_ids) == sorted(set(DOI_ALIASES.values()) | {"doi:10.1/a"})
+
+    vectors = build_representative_vectors(paper_ids, DummyStorage(papers), store, embedder)
+
+    assert len(vectors) == 4
+    assert set(vectors) == set(DOI_ALIASES.values()) | {"doi:10.1/a"}
+    assert not set(vectors) & set(DOI_ALIASES)
+
+
 def test_save_load_round_trip(tmp_path: Path) -> None:
     """`load_vectors(save_vectors(v))` devuelve los mismos ids, valores y dimensión."""
     rng = np.random.default_rng(0)
@@ -183,8 +202,9 @@ def test_get_indexed_paper_ids_excludes_unindexed(monkeypatch: pytest.MonkeyPatc
 
 
 @pytest.mark.slow
-def test_real_corpus_has_158_vectors() -> None:
-    """Con la Biblioteca real (desde la raíz del repo): exactamente 158 vectores (E3 de fase 03)."""
+def test_real_corpus_has_155_vectors() -> None:
+    """Con la Biblioteca real (desde la raíz del repo): 158 indexados (E3 de fase 03) menos
+    3 alias de DOI (A6) = exactamente 155 vectores."""
     from biblioteca.embedder import get_embedder
     from biblioteca.store import ChunkStore
     from excavador.storage import Storage
@@ -198,4 +218,5 @@ def test_real_corpus_has_158_vectors() -> None:
         paper_ids, storage, store, get_embedder(settings.embedding_model)
     )
 
-    assert len(vectors) == 158
+    assert len(paper_ids) == 158
+    assert len(vectors) == 155

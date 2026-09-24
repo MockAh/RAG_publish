@@ -43,7 +43,7 @@ repo antes de firmar cualquier módulo con CLI o con entrada de entorno (A11 de 
 |---|---|---|
 | N0 | Confirmar Q1–Q3 y X1–X8; anotar en la spec 04 | Decisiones cerradas por escrito |
 | N1 | Bootstrap `expertos/`: Settings, `LLMClient`/`GeminiClient`, tabla `llm_calls` | `Ping(ok=True)` real desde la raíz del repo + fila en `llm_calls` |
-| N2 | Vectores representativos de los 158 papers → `.npy` | Test de prefijos; conteo = 158 |
+| N2 | Vectores representativos de los 155 papers únicos (3 duplicados por DOI-variante, ver A6) → `.npy` | Test de prefijos; conteo = 155 |
 | N3 | Barrido de clustering (k = 5–12) + HDBSCAN de contraste; informe de silhouette y tamaños | Informe generado |
 | N4 | Inspección humana de 3 clústeres; elegir k | Criterio 1 cumplido |
 | N5 | Etiquetado LLM: una llamada por clúster (10 títulos + abstracts) | Etiquetas persistidas |

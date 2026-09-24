@@ -1,8 +1,9 @@
 """Vectores representativos de los papers indexados (N2).
 
 Un vector por paper, entrada del clustering de N3. Corpus: solo los papers
-con chunks en Chroma (158, herencia E3 de fase 03), no la tabla `papers`
-completa de `excavador.db`.
+con chunks en Chroma (158 indexados, herencia E3 de fase 03), no la tabla
+`papers` completa de `excavador.db`; tras colapsar los alias de DOI_ALIASES
+quedan 155 papers únicos (A6).
 
 # ══════════════════════════════════════════════════════════════════════════
 # REGLA CRÍTICA (congelada en docs/01-CONTRATOS-DE-DATOS_v11.md, convención
@@ -27,6 +28,19 @@ from excavador.storage import Storage
 
 logger = logging.getLogger(__name__)
 
+# A6 (registro de fase 04): tres papers indexados dos veces con una variante del
+# DOI que el dedup de fase 02 no capturó (compara DOI normalizado exacto; C5).
+# Mismo título, año y autores. alias -> canónico; criterio en
+# `canonicalize_paper_ids`. La duplicación persiste en excavador.db y Chroma (E7).
+DOI_ALIASES: dict[str, str] = {
+    # 1 chunk frente a 26
+    "doi:10.15332/25005375/5376": "doi:10.15332/25005375.5376",
+    # 1 chunk frente a 1: empate, gana el primero alfabéticamente
+    "doi:10.22201/ppla.24487988e.2016.6.58438": "doi:10.22201/ppela.24487988e.2016.6.58438",
+    # 1 chunk frente a 44
+    "doi:10.37819/revhuman.v9i2.866": "doi:10.37819/humanrev.v9i2.866",
+}
+
 
 def get_indexed_paper_ids(
     biblioteca_settings: BibliotecaSettings,
@@ -43,13 +57,33 @@ def get_indexed_paper_ids(
     return sorted(paper.paper_id for paper in storage.all_papers() if store.has_paper(paper.paper_id))
 
 
+def canonicalize_paper_ids(paper_ids: list[str]) -> list[str]:
+    """Colapsa los alias de `DOI_ALIASES` a su `paper_id` canónico, sin repetidos.
+
+    Criterio del canónico (fijado a mano en `DOI_ALIASES`, medido en Chroma al
+    detectar A6): el DOI con más chunks indexados; si empatan, el primero
+    alfabéticamente. Conserva el orden de primera aparición.
+    """
+    canonical: list[str] = []
+    seen: set[str] = set()
+    for paper_id in paper_ids:
+        paper_id = DOI_ALIASES.get(paper_id, paper_id)
+        if paper_id not in seen:
+            seen.add(paper_id)
+            canonical.append(paper_id)
+    return canonical
+
+
 def build_representative_vectors(
     paper_ids: list[str],
     excavador_storage: Storage,
     chunk_store: ChunkStore,
     embedder: Embedder,
 ) -> dict[str, np.ndarray]:
-    """Genera un vector representativo por paper.
+    """Genera un vector representativo por paper, con los alias ya colapsados.
+
+    `paper_ids` pasa antes por `canonicalize_paper_ids` (A6): el resultado
+    tiene una sola entrada por paper real, con clave canónica.
 
     Caso normal: `embed_passages(["<título>. <abstract>"])`. Si el paper no
     tiene abstract (indexado solo por PDF), media de los embeddings
@@ -57,6 +91,7 @@ def build_representative_vectors(
     misma escala que los vectores de e5 (el clustering de N3 compara por
     distancia).
     """
+    paper_ids = canonicalize_paper_ids(paper_ids)
     papers = []
     for paper_id in paper_ids:
         paper = excavador_storage.get_paper(paper_id)
