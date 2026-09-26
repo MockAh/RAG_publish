@@ -3,12 +3,15 @@
 Tabla SQLite `clusters(paper_id, expert_id, run_id)` en `excavador.db`, junto
 a `llm_calls`. `expert_id` = `C{label}` de k-means (C3: `expert_id` =
 cluster_id), la misma nomenclatura que A8/A9 del registro. `run_id` nombra la
-corrida (`kmeans-k9-seed42`): volver a guardar el mismo `run_id` la reemplaza
-entera, así que la operación es idempotente.
+corrida (`kmeans-k9-seed42-<hash8>`) y la ata a los vectores de entrada: si se
+regeneran con otro contenido, cambia el hash y la partición vieja no se
+confunde con la nueva. Volver a guardar el mismo `run_id` la reemplaza entera,
+así que la operación es idempotente.
 """
 
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 from pathlib import Path
 
@@ -24,8 +27,11 @@ CREATE TABLE IF NOT EXISTS clusters (
 """
 
 
-def make_run_id(k: int, seed: int) -> str:
-    return f"kmeans-k{k}-seed{seed}"
+def make_run_id(k: int, seed: int, vectors_path: Path) -> str:
+    """`kmeans-k{k}-seed{seed}-<hash8>`, con los 8 primeros caracteres hex del SHA-256 de
+    `vectors_path` (`np.savez` es determinista: mismo contenido, mismo hash)."""
+    digest = hashlib.sha256(Path(vectors_path).read_bytes()).hexdigest()
+    return f"kmeans-k{k}-seed{seed}-{digest[:8]}"
 
 
 def labels_to_assignment(paper_ids: list[str], labels: np.ndarray) -> dict[str, str]:

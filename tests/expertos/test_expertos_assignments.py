@@ -1,10 +1,12 @@
 """Tests para expertos.assignments (N4)."""
 
+import re
 from pathlib import Path
 
 import numpy as np
 
 from expertos.assignments import labels_to_assignment, load_assignment, make_run_id, save_assignment
+from expertos.vectors import save_vectors
 
 
 def test_labels_to_assignment_uses_native_str_expert_ids() -> None:
@@ -18,10 +20,9 @@ def test_save_load_round_trip(tmp_path: Path) -> None:
     db_path = tmp_path / "excavador.db"
     assignment = {"doi:a": "C1", "doi:b": "C0"}
 
-    save_assignment(db_path, make_run_id(9, 42), assignment)
+    save_assignment(db_path, "kmeans-k9-seed42-0123abcd", assignment)
 
-    assert make_run_id(9, 42) == "kmeans-k9-seed42"
-    assert load_assignment(db_path, "kmeans-k9-seed42") == assignment
+    assert load_assignment(db_path, "kmeans-k9-seed42-0123abcd") == assignment
     assert load_assignment(db_path, "otra-corrida") == {}
 
 
@@ -34,3 +35,16 @@ def test_saving_same_run_replaces_it_and_leaves_other_runs(tmp_path: Path) -> No
 
     assert load_assignment(db_path, "run-a") == {"doi:a": "C3"}
     assert load_assignment(db_path, "run-b") == {"doi:a": "C5"}
+
+
+def test_run_id_is_tied_to_vectors_content(tmp_path: Path) -> None:
+    path_a, path_b, path_a_again = tmp_path / "a.npz", tmp_path / "b.npz", tmp_path / "a2.npz"
+    save_vectors({"doi:a": np.array([1.0, 0.0], dtype=np.float32)}, path_a)
+    save_vectors({"doi:a": np.array([0.0, 1.0], dtype=np.float32)}, path_b)
+    save_vectors({"doi:a": np.array([1.0, 0.0], dtype=np.float32)}, path_a_again)
+
+    run_a = make_run_id(9, 42, path_a)
+
+    assert re.fullmatch(r"kmeans-k9-seed42-[0-9a-f]{8}", run_a)
+    assert make_run_id(9, 42, path_b) != run_a
+    assert make_run_id(9, 42, path_a_again) == run_a  # mismo contenido, mismo run_id

@@ -14,7 +14,8 @@ Orquestador/Redactor/Verificador (05).
 Fase 04, micro-tarea N4 firmada, N5 pendiente. N0–N4 firmadas. 155 papers únicos en
 data/expert_vectors.npz (3 DOI-variante colapsados, ver A5/A6/E3 del registro). k=9
 elegido por inspección humana (A7/A8); asignación en la tabla `clusters` de
-data/excavador.db, run_id `kmeans-k9-seed42`, expert_id `C0`–`C8`.
+data/excavador.db, run_id `kmeans-k9-seed42-98b2c308` (sufijo = SHA-256[:8] de
+expert_vectors.npz), expert_id `C0`–`C8`.
 N5 (etiquetado LLM) no ha empezado — pedir el prompt antes de escribir código.
 Repo: `~/WandaVision/RAG_publish`, rama `main` (ver plan para N0–N14).
 

@@ -109,7 +109,8 @@ k=5, k=8, k=9.**
 
 ### A8 · k=9 elegido por inspección, no por métrica
 **Decidido en:** N4 (resuelve D1). Asignación persistida en `clusters`,
-`run_id = kmeans-k9-seed42` (X5).
+`run_id = kmeans-k9-seed42-98b2c308` (X5; el sufijo son los 8 primeros caracteres del
+SHA-256 de `data/expert_vectors.npz`, que ata la partición a los vectores de entrada).
 El silhouette no discrimina (A7); la decisión se tomó leyendo los 10 papers más cercanos
 al centroide de cada clúster en k=5, 8 y 9 (`data/cluster_inspect_k{5,8,9}.md`).
 **Razón decisiva:** k=5 fusiona en un clúster de 46 papers (un tercio del corpus) dos
@@ -169,6 +170,25 @@ la bibliografía (fase 05).
   capturada por el dedup de fase 02). Colapsados en fase 04 a nivel de vector (A6);
   persisten como registros duplicados en `excavador.db` y `data/chroma`. Corregir si el
   volumen crece en una ingesta futura, o si aparecen más casos.
+  **Ampliación (N4):** la inspección detectó cuatro grupos adicionales sospechosos que
+  `DOI_ALIASES` no cubre: tres registros de *Modelos elementales…* (dos reseñas de 2013 y
+  un tercero, `doi:10.26620/uniminuto.polisemia.9.15.2013.84-87`, 2015, también en
+  C5), *Jornadas Braudelianas* (1994/2018), *Mestizaje cultural y ethos barroco* (2000/2001) y el par
+  Quijano/Echeverría en castellano y catalán. No se verificaron ni se colapsaron, por tres
+  razones: los pares año-divergente son la limitación ya documentada en C1/C2 de fase 02;
+  las versiones idiomáticas son publicaciones distintas y legítimas; y fusionar por título
+  es peligroso (el registro de fase 02 documenta dos reseñas distintas del mismo libro que
+  deben seguir separadas). Además, cada grupo cae dentro de un mismo clúster, así que no
+  distorsiona la partición — solo aporta algo de peso extra. Revisar solo si la tasa
+  crece en una ingesta futura.
+  Comprobado en `clusters` (`run_id = kmeans-k9-seed42-98b2c308`):
+
+  | Grupo | IDs | Clúster |
+  |---|---|---|
+  | *Modelos elementales…* | `doi:10.18504/rl0203-005-2013`, `openalex:W2284838268`, `doi:10.26620/uniminuto.polisemia.9.15.2013.84-87` | C5 |
+  | *Jornadas Braudelianas* | `openalex:W3110251602` (1994), `openalex:W2903663981` (2018) | C5 |
+  | *Mestizaje cultural y ethos barroco* | `openalex:W2140093523` (2000), `openalex:W2516540948` (2001) | C3 |
+  | Quijano/Echeverría ES/CA | `doi:10.1344/oxi.2013.i2.6382`, `openalex:W1524321516` | C8 |
 - **E4 (→02/05, deuda con gatillo):** DOI cruzado en origen. `doi:10.1002/ajpa.22921`
   corresponde a *American Journal of Physical Anthropology* pero titula «Modos y usos del
   pensamiento de Bolívar Echeverría». En fase 05 la bibliografía imprimiría un DOI que
@@ -201,7 +221,7 @@ la bibliografía (fase 05).
 | N1 | Bootstrap `expertos/` + cliente LLM | ✅ 2026-09-23 · commit a4564b0 · 194 tests · hallazgos A1–A4 |
 | N2 | Vectores representativos | ✅ 2026-09-23 · `data/expert_vectors.npz` = 155 vectores (1024-d, norma 1; 158 indexados − 3 alias) · test slow OK · hallazgos A5–A6 |
 | N3 | Barrido de clustering | ✅ 2026-09-26 · `data/cluster_sweep_report.md` (k-means k=5–12 + HDBSCAN, seed=42) · 206 tests (+7 slow) · test slow OK · hallazgo A7 |
-| N4 | Inspección humana; elegir k | ✅ 2026-09-26 · k=9, seed=42, por inspección (A8) · `clusters` run_id `kmeans-k9-seed42` (155 filas) · 211 tests (+7 slow) · hallazgos A8–A9, B2, E4 |
+| N4 | Inspección humana; elegir k | ✅ 2026-09-26 · k=9, seed=42, por inspección (A8) · `clusters` run_id `kmeans-k9-seed42-98b2c308` (155 filas) · 212 tests (+7 slow) · hallazgos A8–A9, B2, E4 |
 | N5 | Etiquetado LLM | ⬜ |
 | N6 | Modelos C3/C4/C5 | ⬜ |
 | N7 | Síntesis 1/2: sub-consultas | ⬜ |

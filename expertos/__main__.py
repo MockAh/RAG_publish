@@ -107,7 +107,7 @@ def cluster_assign(
     settings = Settings()
     X, paper_ids = load_matrix(load_vectors(settings.expert_vectors_path))
     [result] = sweep_kmeans(X, k_min=k, k_max=k, seed=seed)
-    run_id = make_run_id(k, seed)
+    run_id = make_run_id(k, seed, settings.expert_vectors_path)
     save_assignment(settings.db_path, run_id, labels_to_assignment(paper_ids, result.labels))
     sizes = ", ".join(f"C{c}={n}" for c, n in sorted(result.sizes.items(), key=lambda item: -item[1]))
     typer.echo(f"{len(paper_ids)} papers → clusters[run_id={run_id}] en {settings.db_path}: {sizes}")
