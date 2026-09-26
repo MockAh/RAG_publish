@@ -3,6 +3,8 @@
 Uso:
     python -m expertos vectors build
     python -m expertos cluster sweep
+    python -m expertos cluster inspect --k 9
+    python -m expertos cluster assign --k 9
 """
 
 from __future__ import annotations
@@ -14,8 +16,10 @@ import typer
 from biblioteca.config import Settings as BibliotecaSettings
 from biblioteca.embedder import get_embedder
 from biblioteca.store import ChunkStore
+from expertos.assignments import labels_to_assignment, make_run_id, save_assignment
 from expertos.clustering import load_matrix, report, run_hdbscan, sweep_kmeans
 from expertos.config import Settings
+from expertos.inspection import dump_clusters
 from expertos.vectors import (
     build_representative_vectors,
     get_indexed_paper_ids,
@@ -80,6 +84,33 @@ def cluster_sweep() -> None:
         f"{len(paper_ids)} papers, k = {sweep[0].k}–{sweep[-1].k}, "
         f"HDBSCAN: {hdbscan.n_clusters} clústeres + {hdbscan.n_noise} ruido → {settings.cluster_report_path}"
     )
+
+
+@cluster_app.command("inspect")
+def cluster_inspect(k: int = typer.Option(..., "--k", help="Número de clústeres a inspeccionar.")) -> None:
+    """Vuelca los papers más cercanos al centroide de cada clúster en `cluster_inspect_dir/cluster_inspect_k{k}.md`."""
+    _configure_logging()
+    settings = Settings()
+    X, paper_ids = load_matrix(load_vectors(settings.expert_vectors_path))
+    out_path = settings.cluster_inspect_dir / f"cluster_inspect_k{k}.md"
+    dump_clusters(X, paper_ids, k, Storage(settings.db_path), out_path)
+    typer.echo(f"{len(paper_ids)} papers, k={k} → {out_path}")
+
+
+@cluster_app.command("assign")
+def cluster_assign(
+    k: int = typer.Option(..., "--k", help="k elegido en N4."),
+    seed: int = typer.Option(42, "--seed"),
+) -> None:
+    """Persiste la asignación paper → experto del k elegido en la tabla `clusters` (X5)."""
+    _configure_logging()
+    settings = Settings()
+    X, paper_ids = load_matrix(load_vectors(settings.expert_vectors_path))
+    [result] = sweep_kmeans(X, k_min=k, k_max=k, seed=seed)
+    run_id = make_run_id(k, seed)
+    save_assignment(settings.db_path, run_id, labels_to_assignment(paper_ids, result.labels))
+    sizes = ", ".join(f"C{c}={n}" for c, n in sorted(result.sizes.items(), key=lambda item: -item[1]))
+    typer.echo(f"{len(paper_ids)} papers → clusters[run_id={run_id}] en {settings.db_path}: {sizes}")
 
 
 if __name__ == "__main__":

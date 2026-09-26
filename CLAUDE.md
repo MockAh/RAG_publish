@@ -11,10 +11,11 @@ Orquestador/Redactor/Verificador (05).
 
 ## Estado actual
 
-Fase 04, micro-tarea N3 firmada, N4 pendiente. N0–N3 firmadas. 155 papers únicos en
-data/expert_vectors.npz (3 DOI-variante colapsados, ver A5/A6/E3 del registro). Barrido
-de N3 en data/cluster_sweep_report.md: silhouette plano, candidatos vivos k=5, 8, 9 (A7).
-N4 (inspección humana, elegir k) no ha empezado — pedir el prompt antes de escribir código.
+Fase 04, micro-tarea N4 firmada, N5 pendiente. N0–N4 firmadas. 155 papers únicos en
+data/expert_vectors.npz (3 DOI-variante colapsados, ver A5/A6/E3 del registro). k=9
+elegido por inspección humana (A7/A8); asignación en la tabla `clusters` de
+data/excavador.db, run_id `kmeans-k9-seed42`, expert_id `C0`–`C8`.
+N5 (etiquetado LLM) no ha empezado — pedir el prompt antes de escribir código.
 Repo: `~/WandaVision/RAG_publish`, rama `main` (ver plan para N0–N14).
 
 Paquetes previos, YA FIRMADOS, no modificar sin causa documentada (precedente en el

@@ -2,7 +2,7 @@
 
 > Compañero del plan de micro-tareas (`04-PLAN-MICROTAREAS-EXPERTOS.md`).
 > Recoge hallazgos, deuda aceptada y herencias entre micro-tareas.
-> Estado: **fase en curso** · N0–N3 firmadas.
+> Estado: **fase en curso** · N0–N4 firmadas.
 
 ---
 
@@ -107,6 +107,28 @@ solo sirve para descartar. Descartados por la métrica: k ≥ 10 (aparecen clús
 1 paper) y HDBSCAN (>50 % del corpus a ruido, confirma X2). **Candidatos vivos para N4:
 k=5, k=8, k=9.**
 
+### A8 · k=9 elegido por inspección, no por métrica
+**Decidido en:** N4 (resuelve D1). Asignación persistida en `clusters`,
+`run_id = kmeans-k9-seed42` (X5).
+El silhouette no discrimina (A7); la decisión se tomó leyendo los 10 papers más cercanos
+al centroide de cada clúster en k=5, 8 y 9 (`data/cluster_inspect_k{5,8,9}.md`).
+**Razón decisiva:** k=5 fusiona en un clúster de 46 papers (un tercio del corpus) dos
+líneas de recepción que k=9 separa legiblemente — la lectura marxista (C2: teoría
+crítica, Lukács, *El capital*) y la filosofía de la cultura (C4: modernidad barroca). Un
+Experto sobre 46 papers no podría escribir una síntesis con la que el Orquestador rutee.
+k=8 y k=9 son casi idénticos; k=9 gana por mejor reparto (mayor clúster de 35 frente a
+40) y ausencia de clústeres unitarios. Cinco clústeres son inequívocamente nombrables
+(C6 valor de uso, C3 ethos barroco, C2 teoría crítica/marxismo, C4 modernidad barroca,
+C5 Marx/Braudel); C1 (23) es heterogéneo y su etiqueta debe reflejarlo; C0 (6) es el
+misceláneo previsto por X2.
+
+### A9 · C7 (12 papers) es un volumen, no un tema
+**Descubierto en:** N4.
+Agrupa las 12 secciones de *Crítica e interpretación. Homenaje a Bolívar Echeverría*
+(2011). El clustering aisló el material estructural tal como D1 de fase 02 confiaba.
+**Consecuencia para N9:** su síntesis será delgada y su Experto debería declarar
+`confidence="low"` con frecuencia. No es fallo.
+
 ---
 
 ## B · Deuda técnica aceptada
@@ -118,13 +140,20 @@ colisiona en la importación. Se resolvió renombrando a `test_expertos_config.p
 **Por qué se acepta:** añadir `__init__.py` cambiaría la disposición de toda la suite.
 **Convención de la fase:** todo test de `expertos/` se llama `test_expertos_*.py`.
 
+### B2 · Títulos con HTML escapado
+**Origen:** N4. Algunos títulos llegan con entidades HTML (`&lt;i&gt;`, prefijo
+`doi:10.15381/`).
+**Por qué se acepta:** es deuda menor de datos de origen; no se toca la base.
+**Cómo se maneja:** aplicar `html.unescape` al mostrar títulos en el etiquetado (N5) y en
+la bibliografía (fase 05).
+
 ## C · Comportamientos deliberados que parecen bugs
 
 *(vacío aún)*
 
 ## D · Verificaciones pospuestas
 
-- **D1 (→N4):** elección de k. El silhouette será bajo por el carácter monotemático del
+- **D1 (→N4) ✅ resuelta en N4 (A8: k=9).** Elección de k. El silhouette será bajo por el carácter monotemático del
   corpus; manda la inspección humana de 3 clústeres, no la métrica.
 - **D2 (→N9):** coste real de una regeneración completa. Se lee de `llm_calls`, no se estima.
 - **D3 (→N10):** tasa de claims realmente sustentadas, con los fallos clasificados en
@@ -140,6 +169,12 @@ colisiona en la importación. Se resolvió renombrando a `test_expertos_config.p
   capturada por el dedup de fase 02). Colapsados en fase 04 a nivel de vector (A6);
   persisten como registros duplicados en `excavador.db` y `data/chroma`. Corregir si el
   volumen crece en una ingesta futura, o si aparecen más casos.
+- **E4 (→02/05, deuda con gatillo):** DOI cruzado en origen. `doi:10.1002/ajpa.22921`
+  corresponde a *American Journal of Physical Anthropology* pero titula «Modos y usos del
+  pensamiento de Bolívar Echeverría». En fase 05 la bibliografía imprimiría un DOI que
+  resuelve a otro artículo — cita falsa por datos sucios, no por el Redactor.
+  **Gatillo:** corregir esa fila a mano si el paper aparece en las síntesis. Revisar si
+  hay más casos con un censo de DOI-prefijo frente a venue.
 
 ## F · Higiene de proceso
 
@@ -166,7 +201,7 @@ colisiona en la importación. Se resolvió renombrando a `test_expertos_config.p
 | N1 | Bootstrap `expertos/` + cliente LLM | ✅ 2026-09-23 · commit a4564b0 · 194 tests · hallazgos A1–A4 |
 | N2 | Vectores representativos | ✅ 2026-09-23 · `data/expert_vectors.npz` = 155 vectores (1024-d, norma 1; 158 indexados − 3 alias) · test slow OK · hallazgos A5–A6 |
 | N3 | Barrido de clustering | ✅ 2026-09-26 · `data/cluster_sweep_report.md` (k-means k=5–12 + HDBSCAN, seed=42) · 206 tests (+7 slow) · test slow OK · hallazgo A7 |
-| N4 | Inspección humana; elegir k | ⬜ |
+| N4 | Inspección humana; elegir k | ✅ 2026-09-26 · k=9, seed=42, por inspección (A8) · `clusters` run_id `kmeans-k9-seed42` (155 filas) · 211 tests (+7 slow) · hallazgos A8–A9, B2, E4 |
 | N5 | Etiquetado LLM | ⬜ |
 | N6 | Modelos C3/C4/C5 | ⬜ |
 | N7 | Síntesis 1/2: sub-consultas | ⬜ |
