@@ -2,7 +2,7 @@
 
 > Compañero del plan de micro-tareas (`04-PLAN-MICROTAREAS-EXPERTOS.md`).
 > Recoge hallazgos, deuda aceptada y herencias entre micro-tareas.
-> Estado: **fase en curso** · N0–N1 firmadas.
+> Estado: **fase en curso** · N0–N3 firmadas.
 
 ---
 
@@ -95,6 +95,18 @@ origen requiere reabrir fase 02/03 con causa documentada — no se hace en fase 
 `chunk_id` de distinto `paper_id`; el Verificador o el Redactor deberían tratarlos como el
 mismo paper (`DOI_ALIASES` es la fuente) si vuelve a aparecer.
 
+### A7 · Silhouette plano en todo el barrido; la métrica solo sirve para descartar
+**Descubierto en:** N3 (`data/cluster_sweep_report.md`, seed=42).
+El silhouette (coseno) es plano (≤ 0.10) en todo el barrido k=5–12; HDBSCAN manda 80/155
+a ruido. El corpus es monotemático y los subtemas se solapan de verdad, así que ninguna
+métrica interna discrimina entre valores de k: las diferencias (0.096 en k=5 frente a
+0.089 en k=9) están dentro del ruido. Es el mismo fenómeno de banda estrecha de A3
+(fase 02) y A17 (fase 03), ahora en el espacio de papers.
+**Consecuencia:** D1 se resuelve por inspección humana, como estaba previsto — la métrica
+solo sirve para descartar. Descartados por la métrica: k ≥ 10 (aparecen clústeres de
+1 paper) y HDBSCAN (>50 % del corpus a ruido, confirma X2). **Candidatos vivos para N4:
+k=5, k=8, k=9.**
+
 ---
 
 ## B · Deuda técnica aceptada
@@ -153,7 +165,7 @@ colisiona en la importación. Se resolvió renombrando a `test_expertos_config.p
 | N0 | Decisiones Q1–Q3, X1–X8 | ✅ 2026-09-19 |
 | N1 | Bootstrap `expertos/` + cliente LLM | ✅ 2026-09-23 · commit a4564b0 · 194 tests · hallazgos A1–A4 |
 | N2 | Vectores representativos | ✅ 2026-09-23 · `data/expert_vectors.npz` = 155 vectores (1024-d, norma 1; 158 indexados − 3 alias) · test slow OK · hallazgos A5–A6 |
-| N3 | Barrido de clustering | ⬜ |
+| N3 | Barrido de clustering | ✅ 2026-09-26 · `data/cluster_sweep_report.md` (k-means k=5–12 + HDBSCAN, seed=42) · 206 tests (+7 slow) · test slow OK · hallazgo A7 |
 | N4 | Inspección humana; elegir k | ⬜ |
 | N5 | Etiquetado LLM | ⬜ |
 | N6 | Modelos C3/C4/C5 | ⬜ |

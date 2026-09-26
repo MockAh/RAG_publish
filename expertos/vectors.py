@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 # A6 (registro de fase 04): tres papers indexados dos veces con una variante del
 # DOI que el dedup de fase 02 no capturó (compara DOI normalizado exacto; C5).
 # Mismo título, año y autores. alias -> canónico; criterio en
-# `canonicalize_paper_ids`. La duplicación persiste en excavador.db y Chroma (E7).
+# `canonicalize_paper_ids`. La duplicación persiste en excavador.db y Chroma (E3).
 DOI_ALIASES: dict[str, str] = {
     # 1 chunk frente a 26
     "doi:10.15332/25005375/5376": "doi:10.15332/25005375.5376",

@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     chroma_dir: Path = Path("data/chroma")
     synthesis_dir: Path = Path("data/synthesis")
     expert_vectors_path: Path = Path("data/expert_vectors.npz")
+    cluster_report_path: Path = Path("data/cluster_sweep_report.md")
 
     @field_validator("gemini_api_key", "model_synthesis", "model_label", mode="before")
     @classmethod

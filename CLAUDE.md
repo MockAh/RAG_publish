@@ -11,10 +11,10 @@ Orquestador/Redactor/Verificador (05).
 
 ## Estado actual
 
-Fase 04, micro-tarea N2 cerrada, N3 pendiente de iniciar. N0, N1, N2 firmadas (commit
-114d57a). 155 papers únicos en data/expert_vectors.npz (3 DOI-variante colapsados, ver
-A5/A6/E3 del registro). N3 (barrido de clustering) no ha empezado — pedir el prompt antes
-de escribir código.
+Fase 04, micro-tarea N3 firmada, N4 pendiente. N0–N3 firmadas. 155 papers únicos en
+data/expert_vectors.npz (3 DOI-variante colapsados, ver A5/A6/E3 del registro). Barrido
+de N3 en data/cluster_sweep_report.md: silhouette plano, candidatos vivos k=5, 8, 9 (A7).
+N4 (inspección humana, elegir k) no ha empezado — pedir el prompt antes de escribir código.
 Repo: `~/WandaVision/RAG_publish`, rama `main` (ver plan para N0–N14).
 
 Paquetes previos, YA FIRMADOS, no modificar sin causa documentada (precedente en el
@@ -69,16 +69,22 @@ cuota cero — A4 de fase 04). No cambiar sin repetir el sondeo de N1 con llamad
 Toda llamada, éxito o fallo, se registra en la tabla SQLite `llm_calls`
 (`data/excavador.db`).
 
-## Tarea en curso: N2 — Vectores representativos
+## Tarea en curso: N3 — Barrido de clustering
 
-Objetivo: `expertos/vectors.py` que genere un vector representativo por cada uno de los
-158 papers indexados (`passage: título. abstract`; media de chunks solo si falta
-abstract), los guarde en `data/expert_vectors.npz` y exponga `load_vectors`. CLI:
-`python -m expertos vectors build`.
+Objetivo: `expertos/clustering.py` que, sobre los 155 vectores de
+`data/expert_vectors.npz` (`load_vectors`), corra k-means con k = 5–12 y HDBSCAN como
+contraste (decisión X2), y escriba un informe legible en `data/cluster_sweep_report.md`
+(`Settings.cluster_report_path`). CLI: `python -m expertos cluster sweep`.
 
-Ver la fila N2 de `04-PLAN-MICROTAREAS-EXPERTOS.md` para el prompt detallado ya
-consensuado (secciones 1–4: función de construcción, guardado, CLI, tests) y su
-criterio de "hecho cuando" (conteo exacto = 158 vía test `@pytest.mark.slow`).
+- Matriz en orden determinista (por `paper_id`); vectores ya en norma 1, no reescalar.
+- `sweep_kmeans`: `KMeans(random_state=seed, n_init="auto")`, silhouette con métrica
+  coseno, tamaños por clúster. Semilla fija `seed=42` por defecto (Q1), parametrizable.
+- `run_hdbscan`: `sklearn.cluster.HDBSCAN(metric="cosine")` (aceptado directamente,
+  sin matriz precomputada); reporta `n_clusters` y `n_noise` (label -1).
+- El informe **no recomienda un k**: eso lo decide N4 con inspección humana.
 
-Al terminar N2: actualizar la tabla de estado en `04-REGISTRO-CONSIDERACIONES-EXPERTOS.md`
-y avanzar a N3 (barrido de clustering) solo tras confirmar el conteo de 158.
+Hecho cuando: informe generado (fila N3 de `04-PLAN-MICROTAREAS-EXPERTOS.md`), tests
+verdes y test `@pytest.mark.slow` sobre los 155 vectores reales pasando.
+
+Al terminar N3: actualizar la tabla de estado en `04-REGISTRO-CONSIDERACIONES-EXPERTOS.md`
+y avanzar a N4 (inspección humana de 3 clústeres, elegir k) solo tras revisar el informe.

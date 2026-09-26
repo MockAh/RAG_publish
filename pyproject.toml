@@ -17,6 +17,7 @@ dependencies = [
     "chromadb",
     "lxml",
     "google-genai",
+    "scikit-learn",
 ]
 
 [project.optional-dependencies]

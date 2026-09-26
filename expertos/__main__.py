@@ -2,6 +2,7 @@
 
 Uso:
     python -m expertos vectors build
+    python -m expertos cluster sweep
 """
 
 from __future__ import annotations
@@ -13,13 +14,21 @@ import typer
 from biblioteca.config import Settings as BibliotecaSettings
 from biblioteca.embedder import get_embedder
 from biblioteca.store import ChunkStore
+from expertos.clustering import load_matrix, report, run_hdbscan, sweep_kmeans
 from expertos.config import Settings
-from expertos.vectors import build_representative_vectors, get_indexed_paper_ids, save_vectors
+from expertos.vectors import (
+    build_representative_vectors,
+    get_indexed_paper_ids,
+    load_vectors,
+    save_vectors,
+)
 from excavador.storage import Storage
 
 app = typer.Typer()
 vectors_app = typer.Typer()
 app.add_typer(vectors_app, name="vectors")
+cluster_app = typer.Typer()
+app.add_typer(cluster_app, name="cluster")
 
 _NOISY_LOGGERS = (
     "httpx",
@@ -56,6 +65,21 @@ def vectors_build() -> None:
 
     dim = len(next(iter(vectors.values()))) if vectors else 0
     typer.echo(f"{len(vectors)} vectores (dim {dim}) → {settings.expert_vectors_path}")
+
+
+@cluster_app.command("sweep")
+def cluster_sweep() -> None:
+    """Barrido k-means (k = 5–12) + HDBSCAN sobre `expert_vectors_path`; informe en `cluster_report_path`."""
+    _configure_logging()
+    settings = Settings()
+    X, paper_ids = load_matrix(load_vectors(settings.expert_vectors_path))
+    sweep = sweep_kmeans(X)
+    hdbscan = run_hdbscan(X)
+    report(sweep, hdbscan, paper_ids, settings.cluster_report_path)
+    typer.echo(
+        f"{len(paper_ids)} papers, k = {sweep[0].k}–{sweep[-1].k}, "
+        f"HDBSCAN: {hdbscan.n_clusters} clústeres + {hdbscan.n_noise} ruido → {settings.cluster_report_path}"
+    )
 
 
 if __name__ == "__main__":
