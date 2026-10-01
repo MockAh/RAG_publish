@@ -2,7 +2,7 @@
 
 > Compañero del plan de micro-tareas (`04-PLAN-MICROTAREAS-EXPERTOS.md`).
 > Recoge hallazgos, deuda aceptada y herencias entre micro-tareas.
-> Estado: **fase en curso** · N0–N4 firmadas.
+> Estado: **fase en curso** · N0–N5 firmadas.
 
 ---
 
@@ -130,6 +130,144 @@ Agrupa las 12 secciones de *Crítica e interpretación. Homenaje a Bolívar Eche
 **Consecuencia para N9:** su síntesis será delgada y su Experto debería declarar
 `confidence="low"` con frecuencia. No es fallo.
 
+### A10 · Cuota real del free tier: 5 RPM y 20 peticiones/día por modelo
+**Descubierto en:** N5 (primera corrida real del etiquetado, 2026-09-26).
+Los 429 de `gemini-3.6-flash` traen la cuota en el cuerpo del error:
+`GenerateRequestsPerMinutePerProjectPerModel-FreeTier` = **5** y
+`GenerateRequestsPerDayPerProjectPerModel-FreeTier` = **20**. `.env` tenía
+`EXPERTOS_LLM_RPM_LABEL=10` y `EXPERTOS_LLM_RPM_SYNTHESIS=10`, así que el rate limiter
+propio dejaba pasar el doble de lo permitido (tenacity absorbió los 429, pero cada uno
+es un intento perdido). Los 503 «high demand» del modelo también se reintentan: ese día
+hubo 35 intentos registrados en `llm_calls` para 14 éxitos, y la cuota diaria se agotó.
+**Corregido:** `EXPERTOS_LLM_RPM_LABEL=5` y `EXPERTOS_LLM_RPM_SYNTHESIS=5` en `.env`.
+**Consecuencia para N9:** síntesis y etiquetado usan el mismo modelo, así que comparten
+las **20 peticiones diarias**. La síntesis de X3 (8–12 sub-consultas + redacción de
+claims, por clúster) no cabe en 20 llamadas/día para 8–9 Expertos, ni siquiera
+repartida entre varios días sin reintentos. Antes de N9 hay que decidir el escape de
+X6″ (créditos de Cloud) y medir D2 con esa decisión tomada. Hasta entonces, cada
+llamada real se presupuesta: el test slow de N5 cuesta 9.
+**Actualización (2026-09-27): los 503 cuentan contra la cuota diaria.** Reconstruido
+desde `llm_calls` (26/09): el primer 429 con `limit: 20` es el id 26, precedido de solo
+13 éxitos — si contaran únicamente los éxitos, ese 429 no se explica; contando éxitos y
+503 juntos, el id 26 es la petición 22. Los 429 con `limit: 5` son del límite por
+minuto, no del diario. El contador de Google es aproximado (el id 27 pasó después del
+primer 429 diario), así que no conviene apurar el margen.
+**Rendimiento medido:** el 27/09 se gastaron 7 peticiones (ids 38–44) para 3 etiquetas,
+2 de ellas conservadas (C1 y C8; la de C0 fusionado se descartó, A11); C8 necesitó 4
+intentos por saturación. Con 503 frecuentes, las 20 diarias rinden en la práctica 6–8
+llamadas útiles, no 20.
+**Consecuencia para N9, revisada:** el diseño de X3 (8–12 sub-consultas por clúster × 9
+clústeres) es inviable incluso holgadamente en el free tier — no es cuestión de repartir
+la corrida en varios días. La decisión de X6″ (créditos de Cloud, o rediseñar N7/N8
+para gastar una sola llamada por clúster) hay que tomarla **antes de N7, no antes de
+N9**.
+
+### A11 · La fusión C8→C0 se probó y se revirtió, con evidencia
+**Decidido en:** N5 (2026-09-27).
+Ante `coherent=False` en C8 (5 papers), se generó una partición derivada C0+C8
+(`kmeans-k9-seed42-98b2c308+merge-C8-C0`) y se etiquetó para comparar. Resultado: la
+etiqueta fusionada («Crítica de la modernidad y lecturas desde América Latina») es más
+paraguas que la de C0 solo, y su `note` pierde el hilo propio de C0 (razón burguesa,
+eurocentrismo, límites de la secularización), sustituido por el núcleo Quijano que
+aportaba C8. La fusión no gana nitidez: transfiere dispersión. Además la etiqueta
+resultante se solapa con C1, C2 y C4, lo que la vuelve inútil para rutear.
+**Decisión:** 9 clústeres, partición `kmeans-k9-seed42-98b2c308`. La corrida derivada se
+borró de `clusters` y sus etiquetas de `data/cluster_labels.json`. C8 queda como
+clúster pequeño y heterogéneo con etiqueta honesta: **4 papers efectivos** tras la
+stoplist de E4 (5 en la partición), re-etiquetado sin el paper excluido como «Lecturas
+comparadas sobre modernidad latinoamericana y existencialismo» (`coherent=False`). Su
+Experto declarará `confidence="low"` a menudo, como C7 (A9). El código
+`merge_clusters` y su CLI se conservan para ingestas futuras: se descarta esta fusión
+concreta, no la herramienta.
+**Método:** la alternativa se decidió comparando dos etiquetas reales, no razonando
+sobre la partición. Costó 2 peticiones (1 etiqueta + 1 reintento por 503) y evitó una
+decisión estructural tomada a ojo.
+
+### A12 · El test slow de N5 no era reanudable y `llm_calls` no decía qué clúster falló
+**Descubierto en:** N5 (primera corrida del test slow, 2026-09-30).
+`pytest -m slow -k test_real_labeling_of_9_clusters` gastó 9 peticiones (ids 45–53,
+08:24–08:26 UTC): 2 éxitos y 7 × 503, y falló con `ServerError 503` en el tercer
+clúster tras agotar los reintentos. Dos pérdidas: (1) el test no pasaba `labels_path`,
+así que las 2 etiquetas obtenidas se perdieron con la excepción, y relanzar habría
+costado otra vez las 9; (2) `llm_calls` no registraba para qué era cada llamada, así
+que no se podía saber qué clústeres habían fallado.
+**Corregido:**
+- `llm_calls` gana la columna `context` (JSON, genérica: N7–N9 la necesitarán para
+  sub-consultas y claims). `GeminiClient.complete_json(..., context=...)` la escribe en
+  cada intento. Las tablas existentes se migran con `ALTER TABLE` al crear el cliente;
+  las filas anteriores quedan en `NULL`. **Toca `expertos/llm.py`, firmado en N1:** el
+  cambio es aditivo (parámetro opcional, columna nueva) y los tests de N1 siguen verdes
+  sin tocarlos.
+- `label_cluster` envía `{"task": "label", "run_id", "expert_id"}`.
+- `label_all_clusters(..., skip_existing=True)` (exige `labels_path`) omite los
+  clústeres ya guardados para ese `run_id`.
+- El test slow guarda en `data/cluster_labels_slowtest.json` (fuera de git, como todo
+  `data/`) con `skip_existing=True` y verifica las 9 etiquetas leyendo el archivo, así
+  que valen las de corridas anteriores. Relanzar cuesta solo los clústeres que faltan.
+  Para empezar de cero, borrar ese archivo.
+**Diagnóstico tras un fallo:** `SELECT id, ok, json_extract(context, '$.expert_id'),
+substr(error, 1, 60) FROM llm_calls WHERE ts > '<fecha>' ORDER BY id;`
+**Segundo intento (2026-09-30), y salida:** ya reanudable, el test volvió a caer por 503.
+Entre los dos intentos del día, 17 peticiones a Gemini (ids 45–61) para 3 etiquetas
+útiles. Con esa tasa, ni el test slow de N5 cabe con holgura en la cuota diaria, y X3
+(N7–N9) queda descartado en Gemini free tier (A10). → **Decisión X6‴.**
+
+**Decisión X6‴ (2026-09-30): síntesis y etiquetado pasan a DeepSeek.** Sustituye a X6″
+para esas dos tareas. Gemini no se retira: queda como proveedor alternativo para D11
+(Verificador de fase 05 con proveedor distinto al del Redactor).
+- **Código:** `DeepSeekClient` en `expertos/llm.py` (API compatible con OpenAI, `httpx`
+  directo, sin el SDK `openai`, cuyos reintentos propios se sumarían a los de tenacity
+  sin quedar en `llm_calls`). DeepSeek solo ofrece `response_format=json_object`, sin
+  schema nativo: el JSON Schema viaja en el prompt de sistema y la validación sigue
+  siendo `model_validate_json`. Base común `_LoggedLLMClient` con `GeminiClient`
+  (rate limit, reintentos ante 429/5xx/timeout, fila en `llm_calls` por intento).
+  `make_client(task, settings)` elige proveedor según `EXPERTOS_LLM_PROVIDER`.
+- **Settings:** `EXPERTOS_LLM_PROVIDER=deepseek`, `EXPERTOS_DEEPSEEK_API_KEY`,
+  `EXPERTOS_DEEPSEEK_MODEL=deepseek-flash`. Con `deepseek`, faltar clave o modelo es
+  error de arranque, no un 401 a mitad de corrida.
+- **Sondeo (2026-10-01), desde la raíz del repo:** `GET /models` → `deepseek-flash`
+  (DeepSeek-V4.1-Flash, contexto 1 048 576) y `deepseek-v4-pro`. Llamada de humo real con
+  schema trivial → OK en 1,2 s (`llm_calls` id 62). Límites: las docs no declaran RPM ni
+  cuota diaria, solo concurrencia; prepago, **402 = sin saldo**. `GET /user/balance` no
+  trae cabeceras de rate limit: no verificado bajo carga.
+- **Tests:** `tests/expertos/test_expertos_llm_deepseek.py` (28, `pytest-httpx`): JSON
+  válido, inválido y vacío → `LLMOutputError` sin reintento; 429/5xx/timeout
+  reintentados; 400/401/402/422 sin reintento y con el cuerpo en `llm_calls.error`;
+  rate limit; `provider`/`context` en cada fila; `make_client` y validación de Settings.
+- **Coste medido:** ver A13.
+
+### A13 · El campo `coherent` no es reproducible entre proveedores
+**Descubierto en:** N5 (test slow con DeepSeek, 2026-10-01, `llm_calls` ids 63–71).
+Con el mismo prompt y los mismos papers, Gemini (`data/cluster_labels.json`) y DeepSeek
+(`data/cluster_labels_slowtest.json`) discrepan en `coherent` en **4 de 9 clústeres**, en
+ambas direcciones:
+
+| Clúster | Gemini | DeepSeek |
+|---|---|---|
+| C0 | True | False |
+| C1 | False | **True** |
+| C5 | True | False |
+| C7 | True | False |
+
+En C1, DeepSeek marca `coherent=True` mientras su propia `note` enumera las piezas que
+no encajan (dos notas informativas y un estudio bibliométrico): **inconsistencia
+interna, no criterio distinto.**
+**Consecuencia para N12 y fase 05:** la `confidence` de C5 y el `stance` de C3 son
+juicios del mismo tipo, así que hay que asumir la misma inestabilidad. No tratarlos
+como veredictos firmes. N13 (preguntas trampa) debe medir si el proveedor elegido
+reconoce que no sabe. Refuerza L1 (herencia de fase 03) y E4 de fase 03 con evidencia
+propia: ni el score ni un único juicio del LLM son medida estable de confianza.
+**Etiquetas de producción: las de Gemini** (`data/cluster_labels.json`, sin regenerar).
+Ninguna de las 9 contiene «Echeverría» (cuatro de DeepSeek sí: C2, C5, C7, C8; el
+apellido no discrimina porque lo comparte todo el corpus) y su `coherent` concuerda con
+sus `note`. El JSON del test slow se conserva como material de comparación (fuera de
+git, como todo `data/`). **DeepSeek queda como proveedor de síntesis por
+disponibilidad, no por calidad de juicio medida.**
+**Coste medido:** 9 etiquetas = **22 805 tokens** (15 296 de entrada + 7 509 de
+salida), 103 s, cero reintentos. Frente a Gemini: 17 peticiones para 3 etiquetas
+útiles el 30/09 (A12). El saldo prepago no varió de forma visible (4,33 USD antes y
+después).
+
 ---
 
 ## B · Deuda técnica aceptada
@@ -195,6 +333,16 @@ la bibliografía (fase 05).
   resuelve a otro artículo — cita falsa por datos sucios, no por el Redactor.
   **Gatillo:** corregir esa fila a mano si el paper aparece en las síntesis. Revisar si
   hay más casos con un censo de DOI-prefijo frente a venue.
+  **Actualización (N5):** el daño no se limita al DOI. El abstract almacenado también es
+  del otro artículo (metilación de ADN en dientes), así que el vector representativo de
+  N2 se construyó con un texto ajeno y **no representa nada real**; el paper cayó en C8.
+  Lo detectó el propio LLM de etiquetado en la `note` de C8. **Resolución en fase 04:**
+  excluido por stoplist (`EXCLUDED_PAPER_IDS` en `expertos/assignments.py`), aplicada al
+  leer la partición (`load_corpus_assignment`), no al construir vectores: excluirlo en
+  `vectors.py` cambiaría el hash de `expert_vectors.npz`, obligaría a re-clusterizar e
+  invalidaría la inspección de N4 (A8). Su vector sigue entre los 155 que vio k-means
+  (un punto de 155; efecto despreciable y confinado a C8). Corpus efectivo de fase 04:
+  **154 papers**. La fila de `excavador.db` sigue sin tocar (fase 02 firmada).
 
 ## F · Higiene de proceso
 
@@ -210,6 +358,11 @@ la bibliografía (fase 05).
 - **F4 · Una conclusión de Copilot no es evidencia.** En N1 declaró «config issue, not a
   code bug» sobre el 404 y siguió adelante; la causa real era otra. Las afirmaciones
   causales se verifican a mano antes de aceptarlas.
+- **F5 · Leer la salida antes de relanzar un comando que gasta cuota.** En N5 el test slow
+  falló y se relanzó solo para ver el error, que ya estaba en la salida anterior; la
+  segunda corrida quemó ~6 intentos más y agotó la cuota diaria (A10). Con llamadas
+  LLM reales: redirigir la salida a un archivo y leerlo, o leer `llm_calls.error`, que ya
+  guarda el mensaje completo — nunca repetir la llamada para diagnosticar.
 
 ---
 
@@ -222,7 +375,7 @@ la bibliografía (fase 05).
 | N2 | Vectores representativos | ✅ 2026-09-23 · `data/expert_vectors.npz` = 155 vectores (1024-d, norma 1; 158 indexados − 3 alias) · test slow OK · hallazgos A5–A6 |
 | N3 | Barrido de clustering | ✅ 2026-09-26 · `data/cluster_sweep_report.md` (k-means k=5–12 + HDBSCAN, seed=42) · 206 tests (+7 slow) · test slow OK · hallazgo A7 |
 | N4 | Inspección humana; elegir k | ✅ 2026-09-26 · k=9, seed=42, por inspección (A8) · `clusters` run_id `kmeans-k9-seed42-98b2c308` (155 filas) · 212 tests (+7 slow) · hallazgos A8–A9, B2, E4 |
-| N5 | Etiquetado LLM | ⬜ |
+| N5 | Etiquetado LLM | ✅ 2026-10-01 · `data/cluster_labels.json` (C0–C8, Gemini) · test slow OK con DeepSeek (9/9, 22 805 tokens) · 264 tests (+8 slow) · hallazgos A10–A13, decisión X6‴ |
 | N6 | Modelos C3/C4/C5 | ⬜ |
 | N7 | Síntesis 1/2: sub-consultas | ⬜ |
 | N8 | Síntesis 2/2: claims validadas | ⬜ |

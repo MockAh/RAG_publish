@@ -23,6 +23,13 @@ class PaperLookup(Protocol):
     def get_paper(self, paper_id: str) -> PaperRecord | None: ...
 
 
+def closest_to_centroid(X: np.ndarray, centroid: np.ndarray, n: int) -> np.ndarray:
+    """Índices de las `n` filas de `X` más cercanas (euclídea) a `centroid`, de la más
+    cercana a la más lejana; todas si `n ≥ len(X)`. Empates en el orden original."""
+    distances = np.linalg.norm(X - centroid, axis=1)
+    return np.argsort(distances, kind="stable")[:n]
+
+
 def dump_clusters(
     X: np.ndarray,
     paper_ids: list[str],
@@ -40,7 +47,6 @@ def dump_clusters(
     """
     kmeans = KMeans(n_clusters=k, random_state=seed, n_init="auto").fit(X)
     labels = kmeans.labels_
-    distances = np.linalg.norm(X - kmeans.cluster_centers_[labels], axis=1)
 
     cluster_ids = sorted(range(k), key=lambda c: (-int((labels == c).sum()), c))
     lines = [
@@ -52,7 +58,7 @@ def dump_clusters(
     ]
     for cluster_id in cluster_ids:
         members = np.flatnonzero(labels == cluster_id)
-        closest = members[np.argsort(distances[members], kind="stable")][:n_sample]
+        closest = members[closest_to_centroid(X[members], kmeans.cluster_centers_[cluster_id], n_sample)]
         lines += [f"## Clúster {cluster_id} — {len(members)} papers", ""]
         for index in closest:
             paper_id = paper_ids[index]

@@ -11,12 +11,16 @@ Orquestador/Redactor/Verificador (05).
 
 ## Estado actual
 
-Fase 04, micro-tarea N4 firmada, N5 pendiente. N0–N4 firmadas. 155 papers únicos en
+Fase 04, micro-tarea N5 firmada, N6 pendiente. N0–N5 firmadas. 155 papers únicos en
 data/expert_vectors.npz (3 DOI-variante colapsados, ver A5/A6/E3 del registro). k=9
 elegido por inspección humana (A7/A8); asignación en la tabla `clusters` de
 data/excavador.db, run_id `kmeans-k9-seed42-98b2c308` (sufijo = SHA-256[:8] de
-expert_vectors.npz), expert_id `C0`–`C8`.
-N5 (etiquetado LLM) no ha empezado — pedir el prompt antes de escribir código.
+expert_vectors.npz), expert_id `C0`–`C8`. Corpus efectivo 154 (stoplist E4 vía
+`load_corpus_assignment`).
+Etiquetas de producción en `data/cluster_labels.json` (Gemini, C0–C8; A13).
+`data/cluster_labels_slowtest.json` (DeepSeek) es solo material de comparación: no
+sustituye a las de producción ni se regenera.
+N6 (modelos C3/C4/C5) no ha empezado — pedir el prompt antes de escribir código.
 Repo: `~/WandaVision/RAG_publish`, rama `main` (ver plan para N0–N14).
 
 Paquetes previos, YA FIRMADOS, no modificar sin causa documentada (precedente en el
@@ -59,34 +63,47 @@ registro de fase 02, sección B): `excavador/`, `biblioteca/`.
 
 ## Proveedor LLM de esta fase
 
-Gemini API vía `expertos/llm.py` (`GeminiClient`, implementa `LLMClient.complete_json`,
-cliente agnóstico de proveedor — X8, habilita D11: el Verificador de fase 05 usará un
-proveedor distinto al del Redactor).
+**Síntesis y etiquetado: DeepSeek** (X6‴, A12–A13 del registro), vía `expertos/llm.py`.
+`make_client(task, settings)` devuelve el cliente de `EXPERTOS_LLM_PROVIDER`
+(`deepseek` | `gemini`); ambos implementan `LLMClient.complete_json` sobre la base común
+`_LoggedLLMClient` (cliente agnóstico — X8).
 
-Modelos en `.env` (`EXPERTOS_MODEL_SYNTHESIS`, `EXPERTOS_MODEL_LABEL`): **ambos
-`gemini-3.6-flash`**. Los Pro son inaccesibles en el free tier (2.5 retirado, 3.1 con
-cuota cero — A4 de fase 04). No cambiar sin repetir el sondeo de N1 con llamadas reales
-(`models.list()` no basta: "listar no es poder llamar").
+- **DeepSeek** (`DeepSeekClient`, httpx directo): `.env` con `EXPERTOS_LLM_PROVIDER=deepseek`,
+  `EXPERTOS_DEEPSEEK_API_KEY`, `EXPERTOS_DEEPSEEK_MODEL=deepseek-flash` (el mismo para
+  ambas tareas). Solo `response_format=json_object`: el schema viaja en el prompt de
+  sistema. Prepago: **402 = sin saldo**, no se reintenta. Las docs no declaran RPM ni cuota
+  diaria (no verificado bajo carga); el rate limiter propio sigue en `llm_rpm_<task>`.
+  Coste medido: etiquetar los 9 clústeres = 22 805 tokens, 103 s, cero reintentos.
+- **Gemini** (`GeminiClient`, `gemini-3.6-flash`) se conserva para D11: el Verificador
+  de fase 05 usará un proveedor distinto al del Redactor. Free tier: 5 RPM / 20
+  peticiones/día y 503 frecuentes (A10) — no apto para síntesis.
+- Elegido **por disponibilidad, no por calidad de juicio medida** (A13): `coherent` no es
+  reproducible entre proveedores (4/9 discrepan). `confidence` (C5) y `stance` (C3) son
+  juicios del mismo tipo — no tratarlos como veredictos firmes.
+
+No cambiar de proveedor ni de modelo sin sondeo con llamadas reales desde la raíz del
+repo (`GET /models` / `models.list()` no basta: "listar no es poder llamar").
 
 Toda llamada, éxito o fallo, se registra en la tabla SQLite `llm_calls`
-(`data/excavador.db`).
+(`data/excavador.db`), con `provider` y `context` (JSON: para qué era la llamada).
+Diagnóstico tras un fallo: leer `llm_calls.error`, nunca relanzar (F5).
 
-## Tarea en curso: N3 — Barrido de clustering
+## Tarea en curso: N6 — Modelos C3/C4/C5
 
-Objetivo: `expertos/clustering.py` que, sobre los 155 vectores de
-`data/expert_vectors.npz` (`load_vectors`), corra k-means con k = 5–12 y HDBSCAN como
-contraste (decisión X2), y escriba un informe legible en `data/cluster_sweep_report.md`
-(`Settings.cluster_report_path`). CLI: `python -m expertos cluster sweep`.
+Objetivo (fila N6 de `04-PLAN-MICROTAREAS-EXPERTOS.md`): modelos pydantic de los contratos
+C3 (`Synthesis`), C4 (`SynthesisMap`) y C5 (`ExpertAnswer`) de
+`docs/01-CONTRATOS-DE-DATOS_v11.md`, y su persistencia en `data/synthesis/`
+(`data/synthesis/{expert_id}.json`, `data/synthesis_map.json` — X5).
 
-- Matriz en orden determinista (por `paper_id`); vectores ya en norma 1, no reescalar.
-- `sweep_kmeans`: `KMeans(random_state=seed, n_init="auto")`, silhouette con métrica
-  coseno, tamaños por clúster. Semilla fija `seed=42` por defecto (Q1), parametrizable.
-- `run_hdbscan`: `sklearn.cluster.HDBSCAN(metric="cosine")` (aceptado directamente,
-  sin matriz precomputada); reporta `n_clusters` y `n_noise` (label -1).
-- El informe **no recomienda un k**: eso lo decide N4 con inspección humana.
+- Los campos salen de los contratos, sin romper compatibilidad. `stance` (C3) y
+  `confidence` (C5) son juicios del LLM (L1, L2, A13): ningún validador ni default los
+  deriva de un score o umbral.
+- Frontera modelo→persistencia: tipos nativos de Python (regla 5).
+- N6 no hace llamadas LLM.
+- Antes de escribir código: reescribir esta sección con el prompt de N6 (pedirlo).
 
-Hecho cuando: informe generado (fila N3 de `04-PLAN-MICROTAREAS-EXPERTOS.md`), tests
-verdes y test `@pytest.mark.slow` sobre los 155 vectores reales pasando.
+Hecho cuando: round-trip JSON en verde (fila N6 del plan) y tests rápidos verdes.
 
-Al terminar N3: actualizar la tabla de estado en `04-REGISTRO-CONSIDERACIONES-EXPERTOS.md`
-y avanzar a N4 (inspección humana de 3 clústeres, elegir k) solo tras revisar el informe.
+Al terminar N6: actualizar la tabla de estado en `04-REGISTRO-CONSIDERACIONES-EXPERTOS.md`;
+N7 empieza con DeepSeek (X6‴), y su diseño (X3) debe presupuestar llamadas con
+`llm_calls` (D2).

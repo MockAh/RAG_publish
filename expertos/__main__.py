@@ -5,10 +5,13 @@ Uso:
     python -m expertos cluster sweep
     python -m expertos cluster inspect --k 9
     python -m expertos cluster assign --k 9
+    python -m expertos cluster label [--expert-id C8] [--run-id ...]
+    python -m expertos cluster merge --from C8 --into C0
 """
 
 from __future__ import annotations
 
+import hashlib
 import logging
 
 import typer
@@ -16,10 +19,19 @@ import typer
 from biblioteca.config import Settings as BibliotecaSettings
 from biblioteca.embedder import get_embedder
 from biblioteca.store import ChunkStore
-from expertos.assignments import labels_to_assignment, make_run_id, save_assignment
+from expertos.assignments import (
+    labels_to_assignment,
+    load_assignment,
+    load_corpus_assignment,
+    make_run_id,
+    merge_clusters,
+    save_assignment,
+)
 from expertos.clustering import load_matrix, report, run_hdbscan, sweep_kmeans
 from expertos.config import Settings
 from expertos.inspection import dump_clusters
+from expertos.labeling import label_all_clusters, label_cluster, update_labels
+from expertos.llm import make_client
 from expertos.vectors import (
     build_representative_vectors,
     get_indexed_paper_ids,
@@ -111,6 +123,71 @@ def cluster_assign(
     save_assignment(settings.db_path, run_id, labels_to_assignment(paper_ids, result.labels))
     sizes = ", ".join(f"C{c}={n}" for c, n in sorted(result.sizes.items(), key=lambda item: -item[1]))
     typer.echo(f"{len(paper_ids)} papers → clusters[run_id={run_id}] en {settings.db_path}: {sizes}")
+
+
+@cluster_app.command("label")
+def cluster_label(
+    expert_id: str | None = typer.Option(None, "--expert-id", help="Etiquetar solo este clúster (p. ej. C8)."),
+    run_id: str | None = typer.Option(None, "--run-id", help="Por defecto, `cluster_run_id` de Settings."),
+) -> None:
+    """Etiqueta los clústeres con el LLM (una llamada por clúster) y los guarda en `cluster_labels_path`."""
+    _configure_logging()
+    settings = Settings()
+    run_id = run_id or settings.cluster_run_id
+    # El sufijo del run_id base ata la partición a los vectores (A8): con otros vectores, el centroide
+    # mentiría. Una corrida derivada (`<base>+merge-…`) hereda el hash de su base.
+    vectors_hash = hashlib.sha256(settings.expert_vectors_path.read_bytes()).hexdigest()[:8]
+    if not run_id.split("+", 1)[0].endswith(f"-{vectors_hash}"):
+        typer.echo(f"{run_id} no corresponde a {settings.expert_vectors_path} (hash {vectors_hash})", err=True)
+        raise typer.Exit(1)
+
+    context = dict(
+        run_id=run_id,
+        vectors=load_vectors(settings.expert_vectors_path),
+        db_path=settings.db_path,
+        excavador_storage=Storage(settings.db_path),
+    )
+    llm_client = make_client("label", settings)
+    if expert_id is None:
+        # Guarda tras cada clúster: un 429 de cuota diaria no pierde lo ya etiquetado.
+        new_labels = label_all_clusters(llm_client, **context, labels_path=settings.cluster_labels_path)
+        expected = set(load_corpus_assignment(settings.db_path, run_id).values())
+    else:
+        new_labels = {expert_id: label_cluster(expert_id, llm_client, **context)}
+        update_labels(settings.cluster_labels_path, run_id, new_labels)
+        expected = {expert_id}
+
+    for eid, label in sorted(new_labels.items(), key=lambda item: int(item[0][1:])):
+        flag = "" if label.coherent else "  [coherent=False]"
+        typer.echo(f"{eid}: {label.topic_label}{flag}")
+        typer.echo(f"    {label.one_liner}")
+        if label.note:
+            typer.echo(f"    note: {label.note}")
+    missing = sorted(expected - new_labels.keys(), key=lambda e: int(e[1:]))
+    typer.echo(f"{len(new_labels)} etiquetas nuevas → {settings.cluster_labels_path} [{run_id}]")
+    if missing:
+        typer.echo(f"Sin etiqueta (reintentar con --expert-id): {', '.join(missing)}", err=True)
+        raise typer.Exit(1)
+
+
+@cluster_app.command("merge")
+def cluster_merge(
+    source: str = typer.Option(..., "--from", help="Clúster que desaparece (p. ej. C8)."),
+    target: str = typer.Option(..., "--into", help="Clúster que lo absorbe (p. ej. C0)."),
+    run_id: str | None = typer.Option(None, "--run-id", help="Por defecto, `cluster_run_id` de Settings."),
+) -> None:
+    """Guarda en `clusters` una corrida derivada `<run_id>+merge-<from>-<into>`; la de origen no se toca."""
+    _configure_logging()
+    settings = Settings()
+    run_id = run_id or settings.cluster_run_id
+    derived = merge_clusters(settings.db_path, run_id, source, target)
+    corpus = load_corpus_assignment(settings.db_path, derived)
+    n_target = sum(1 for eid in load_assignment(settings.db_path, derived).values() if eid == target)
+    n_corpus = sum(1 for eid in corpus.values() if eid == target)
+    typer.echo(
+        f"{derived}: {len(set(corpus.values()))} clústeres; {target} = {n_target} papers "
+        f"({n_corpus} tras la stoplist)"
+    )
 
 
 if __name__ == "__main__":

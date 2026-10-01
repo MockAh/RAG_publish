@@ -20,7 +20,8 @@
 | X3 | **Síntesis sin alucinación por construcción:** el LLM genera 8–12 sub-consultas → `retrieve` sobre la partición → el LLM redacta claims → el código valida `supporting_chunks ⊆ recuperados`. Claim inválido se descarta, no se repara | «Prohibido afirmar sin chunk_id» lo garantiza el código, no el prompt |
 | X4 | **`stance` se clasifica por pasaje** sobre material recuperado por tema | L2: buscar «críticas a X» devuelve exposiciones de X |
 | X5 | Paquete `expertos/`. Tabla SQLite `clusters(paper_id, expert_id, run_id)`; `data/synthesis/{expert_id}.json` (C3); `data/synthesis_map.json` (C4) | Persistencia auditable, patrón de P4/P8 |
-| X6″ | **Síntesis y etiquetado en `gemini-3.6-flash`** | Los Pro son inaccesibles en el free tier: 2.5 retirado, 3.1 con cuota cero (ver A4 del registro). Escapes si N10 sale flojo: activar los créditos de Cloud, o `gemini-3.8-flash` |
+| X6″ | ~~Síntesis y etiquetado en `gemini-3.6-flash`~~ (sustituida por X6‴) | Los Pro son inaccesibles en el free tier: 2.5 retirado, 3.1 con cuota cero (ver A4 del registro) |
+| X6‴ | **Síntesis y etiquetado en DeepSeek (`deepseek-flash`)**; Gemini se conserva para D11 | Cuota real de Gemini free tier (20/día) y 503 frecuentes hacen inviable X3 (A10, A12). Elegido por disponibilidad, no por calidad de juicio medida (A13) |
 | X7 | Los chunks `from_abstract` son citables, pero el prompt prefiere un chunk de PDF cuando ambos sustentan la claim | E1 de fase 03: texto degradado |
 | X8 | **Cliente LLM agnóstico de proveedor:** `LLMClient.complete_json(system, user, schema) -> BaseModel` | Cambiar de proveedor es una línea de config. Habilita D11 |
 
@@ -77,4 +78,5 @@ N9 es corrida desatendida: se lanza al final de la sesión y se revisa al día s
 - **105 de los 158 papers aportan un solo chunk de abstract** degradado: el peso real del
   corpus verificable está en los 55 con PDF (E3 de fase 03).
 - **Cuota del free tier de Gemini:** el modelo elegido tiene 1 500 peticiones diarias, pero
-  la disponibilidad puede cambiar sin aviso (ver A4 del registro).
+  la disponibilidad puede cambiar sin aviso (ver A4 del registro). **Materializado:** la
+  cuota real era 20/día (A10); síntesis y etiquetado pasan a DeepSeek (X6‴).

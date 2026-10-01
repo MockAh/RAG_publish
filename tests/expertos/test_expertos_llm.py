@@ -163,6 +163,49 @@ def test_successful_call_logs_row_with_model_and_tokens(
     assert row == ("gemini-x", 42, 7, 1)
 
 
+def test_context_is_logged_as_json_on_every_attempt(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)  # cwd sin .env: no hereda config del repo
+
+    client = _client(
+        tmp_path,
+        [errors.ServerError(503, {"error": {"message": "high demand"}}), _FakeResponse('{"ok": true}')],
+    )
+
+    client.complete_json("system", "user", Ping, context={"task": "label", "expert_id": "C3"})
+
+    conn = sqlite3.connect(tmp_path / "expertos.db")
+    rows = conn.execute("SELECT ok, json_extract(context, '$.expert_id') FROM llm_calls ORDER BY id").fetchall()
+    assert rows == [(0, "C3"), (1, "C3")]
+
+
+def test_call_without_context_logs_null(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)  # cwd sin .env: no hereda config del repo
+
+    client = _client(tmp_path, [_FakeResponse('{"ok": true}')])
+    client.complete_json("system", "user", Ping)
+
+    conn = sqlite3.connect(tmp_path / "expertos.db")
+    assert conn.execute("SELECT context FROM llm_calls").fetchone() == (None,)
+
+
+def test_old_table_without_context_column_is_migrated(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)  # cwd sin .env: no hereda config del repo
+    conn = sqlite3.connect(tmp_path / "expertos.db")
+    conn.execute(
+        "CREATE TABLE llm_calls (id INTEGER PRIMARY KEY, ts TEXT, provider TEXT, model TEXT,"
+        " input_tokens INTEGER, output_tokens INTEGER, latency_ms INTEGER, ok INTEGER, error TEXT)"
+    )
+    conn.execute("INSERT INTO llm_calls (ts, ok) VALUES ('2026-09-27', 1)")
+    conn.commit()
+
+    client = _client(tmp_path, [_FakeResponse('{"ok": true}')])
+    client.complete_json("system", "user", Ping, context={"expert_id": "C0"})
+
+    rows = conn.execute("SELECT ts, context FROM llm_calls ORDER BY id").fetchall()
+    assert rows[0] == ("2026-09-27", None)
+    assert rows[1][1] == '{"expert_id": "C0"}'
+
+
 @pytest.mark.slow
 def test_real_call_against_model_label(tmp_path: Path) -> None:
     """Llamada real contra `model_label` (nunca `model_synthesis`, cuota diaria reservada)."""
