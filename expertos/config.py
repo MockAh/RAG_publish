@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     db_path: Path = Path("data/excavador.db")
     chroma_dir: Path = Path("data/chroma")
     synthesis_dir: Path = Path("data/synthesis")
+    synthesis_map_path: Path = Path("data/synthesis_map.json")
     expert_vectors_path: Path = Path("data/expert_vectors.npz")
     cluster_report_path: Path = Path("data/cluster_sweep_report.md")
     cluster_inspect_dir: Path = Path("data")

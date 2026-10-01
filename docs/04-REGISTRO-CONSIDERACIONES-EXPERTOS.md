@@ -2,7 +2,7 @@
 
 > Compañero del plan de micro-tareas (`04-PLAN-MICROTAREAS-EXPERTOS.md`).
 > Recoge hallazgos, deuda aceptada y herencias entre micro-tareas.
-> Estado: **fase en curso** · N0–N5 firmadas.
+> Estado: **fase en curso** · N0–N6 firmadas.
 
 ---
 
@@ -288,7 +288,18 @@ la bibliografía (fase 05).
 
 ## C · Comportamientos deliberados que parecen bugs
 
-*(vacío aún)*
+- **C1 · `ExpertAnswer.gaps` es obligatorio aunque admita `None`** (N6). El contrato C5
+  escribe `gaps: str | None` sin default; se transcribe literal. Omitir el campo es error
+  de validación: el Experto tiene que pronunciarse sobre lo que su corpus no cubre (N13).
+- **C2 · Un `Claim` con `supporting_chunks=[]` se rechaza** (N6), también dentro de
+  `ExpertAnswer.evidence`. C3 no autoriza la lista vacía y D5 prohíbe afirmar sin
+  `chunk_id`; X3: la claim inválida se descarta, no se repara.
+- **C3 · `SynthesisMap` no está en el contrato** (N6). C4 define solo la entrada; el
+  contenedor (`run_id`, `updated_at`, `entries`) es decisión de fase 04 y rechaza
+  `expert_id` repetidos. Las entradas son C4 literal. A propagar a `01` en N14.
+- **C4 · Las funciones de persistencia reciben la ruta como argumento keyword**
+  (`synthesis_dir=`, `path=`), no leen `Settings` por dentro: mismo patrón que
+  `save_labels` / `db_path`, y los tests no dependen del `.env`.
 
 ## D · Verificaciones pospuestas
 
@@ -376,7 +387,7 @@ la bibliografía (fase 05).
 | N3 | Barrido de clustering | ✅ 2026-09-26 · `data/cluster_sweep_report.md` (k-means k=5–12 + HDBSCAN, seed=42) · 206 tests (+7 slow) · test slow OK · hallazgo A7 |
 | N4 | Inspección humana; elegir k | ✅ 2026-09-26 · k=9, seed=42, por inspección (A8) · `clusters` run_id `kmeans-k9-seed42-98b2c308` (155 filas) · 212 tests (+7 slow) · hallazgos A8–A9, B2, E4 |
 | N5 | Etiquetado LLM | ✅ 2026-10-01 · `data/cluster_labels.json` (C0–C8, Gemini) · test slow OK con DeepSeek (9/9, 22 805 tokens) · 264 tests (+8 slow) · hallazgos A10–A13, decisión X6‴ |
-| N6 | Modelos C3/C4/C5 | ⬜ |
+| N6 | Modelos C3/C4/C5 | ✅ 2026-10-01 · `expertos/models.py` (campos 1:1 con C3/C4/C5, verificados también contra el documento de contratos) + `expertos/persistence.py` (escritura atómica) · 323 tests (+8 slow) · comportamientos deliberados C1–C4 (sección C) |
 | N7 | Síntesis 1/2: sub-consultas | ⬜ |
 | N8 | Síntesis 2/2: claims validadas | ⬜ |
 | N9 | Corrida completa de síntesis | ⬜ |

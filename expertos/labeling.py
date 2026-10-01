@@ -39,10 +39,10 @@ from excavador.models import PaperRecord
 from expertos.assignments import load_corpus_assignment
 from expertos.inspection import PaperLookup, closest_to_centroid
 from expertos.llm import LLMClient, LLMOutputError
+from expertos.models import check_one_liner
 
 logger = logging.getLogger(__name__)
 
-ONE_LINER_MAX_WORDS = 40
 ABSTRACT_MAX_CHARS = 400
 
 _TAG_RE = re.compile(r"<[^>]+>")
@@ -57,13 +57,7 @@ class ClusterLabel(BaseModel):
     coherent: bool  # False si los papers no comparten tema reconocible
     note: str | None  # por qué no es coherente, o matiz relevante
 
-    @field_validator("one_liner")
-    @classmethod
-    def _one_liner_fits_c4(cls, value: str) -> str:
-        n_words = len(value.split())
-        if n_words > ONE_LINER_MAX_WORDS:
-            raise ValueError(f"one_liner tiene {n_words} palabras; C4 admite ≤ {ONE_LINER_MAX_WORDS}")
-        return value
+    _one_liner_fits_c4 = field_validator("one_liner")(check_one_liner)
 
 
 def _clean(text: str) -> str:
