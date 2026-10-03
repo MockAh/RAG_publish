@@ -30,6 +30,14 @@ def check_one_liner(value: str) -> str:
     return value
 
 
+def check_summary(value: str) -> str:
+    """Rechaza un `summary` fuera de 300–800 palabras (C3)."""
+    n_words = len(value.split())
+    if not SUMMARY_MIN_WORDS <= n_words <= SUMMARY_MAX_WORDS:
+        raise ValueError(f"summary tiene {n_words} palabras; C3 exige {SUMMARY_MIN_WORDS}–{SUMMARY_MAX_WORDS}")
+    return value
+
+
 class Claim(BaseModel):
     """Afirmación atómica con los `chunk_id` que la sustentan (C3; también la usa C5).
 
@@ -53,15 +61,7 @@ class Synthesis(BaseModel):
     paper_ids: list[str]  # corpus que cubre
     updated_at: datetime
 
-    @field_validator("summary")
-    @classmethod
-    def _summary_length(cls, value: str) -> str:
-        n_words = len(value.split())
-        if not SUMMARY_MIN_WORDS <= n_words <= SUMMARY_MAX_WORDS:
-            raise ValueError(
-                f"summary tiene {n_words} palabras; C3 exige {SUMMARY_MIN_WORDS}–{SUMMARY_MAX_WORDS}"
-            )
-        return value
+    _summary_length = field_validator("summary")(check_summary)
 
 
 class SynthesisMapEntry(BaseModel):

@@ -369,6 +369,110 @@ cita infiel con un `chunk_id` válido, que la validación `supporting_chunks ⊆
 de X3 no detecta. Revisar si hay más obra primaria (traducciones y ediciones de textos
 de Echeverría o de otros) con un censo de `authors` que no contengan a ningún
 comentarista. No se ha hecho.
+**Dato de autoría (N8, censo previo, 2026-10-03, sin LLM):** de los 154 papers del corpus
+efectivo, **solo 3 tienen «Echeverría» en `authors`, y uno es Julio Echeverría, no
+Bolívar** (`openalex:W2485338004`, mesa del homenaje de 2011). Los otros dos son
+`doi:10.2307/jj.39017669.8` (*La religión de los modernos*, con un solo chunk de abstract)
+y `openalex:W1675963835` (una nota de prensa sobre un premio). Ninguno aporta texto de
+PDF escrito por Echeverría. **Confirma E3 de fase 02 desde dentro: el corpus verificable
+es recepción, no obra primaria.** Por eso la regla de atribución no puede apoyarse en la
+autoría del sujeto. «Autor distinto de Echeverría» describe a 151 de 154 papers, y marcar
+por ese criterio no distinguiría nada. La auditoría de N8 usa una lista explícita de obra
+primaria conocida (`PRIMARY_WORKS`).
+**Censo de obra primaria (N8, sin LLM).** Se revisaron los 154 papers con tres señales:
+autor canónico (Marx, Benjamin, el propio Echeverría…), patrones en el título
+(traducción, entrevista, edición, *El capital*…) y patrones en el abstract
+(republicación, traducción, entrevista). Se leyeron los chunks de cada candidato fuerte.
+Entran en `PRIMARY_WORKS` (`expertos/assignments.py`) cuatro papers cuyo texto indexado no
+es de quien figura en `authors`:
+
+| paper_id | Clúster | Qué es | Autor real del texto |
+|---|---|---|---|
+| `doi:10.29166/economia.v70i111.1393` | C1 | *El capital*, cap. I | Karl Marx (traducción de Echeverría) |
+| `doi:10.22201/cisan.24487228e.2009.01.37` | C0 | Entrevista a Echeverría (2009); `authors` = los entrevistadores | Bolívar Echeverría (respuestas) |
+| `doi:10.17141/iconos.17.2003.502` | C4 | Diálogo con Echeverría (2003); `authors` = los entrevistadores | Bolívar Echeverría (respuestas) |
+| `openalex:W1675963835` | C1 | Nota de prensa sobre el premio por *Vuelta de siglo*; `authors` incluye a Echeverría y a un gobierno | Laura Romero (periodista) |
+
+Las dos entrevistas son las **únicas piezas con palabras de Echeverría en PDF**. Por
+`authors`, se le atribuirían a los entrevistadores y la regla de atribución las
+descartaría como sustento de lo que piensa Echeverría. Por eso el `real_author` sustituye
+a `authors` en el prompt de N8, y no solo marca el claim.
+**Caso descartado que enseña algo: `doi:10.15517/revfil.2025.2132`** (Sigüenza, 2025). El
+abstract anuncia que la pieza reproduce el discurso de Echeverría como profesor emérito
+(2009). Pero los 29 chunks indexados son solo la conferencia de Sigüenza y la nota del
+director: el discurso no llegó al índice. **El abstract describe el artículo publicado, no
+lo que GROBID extrajo.** Una decisión sobre qué texto contiene un paper se toma leyendo
+sus chunks, nunca el abstract.
+**Límite del censo:** es heurístico. Una obra primaria sin marcas en el título, el
+abstract ni `authors` se escaparía. La búsqueda de «traducción de Bolívar Echeverría» en
+el texto de todos los chunks dio cero resultados, pero no es exhaustiva. Si N10 encuentra
+otra, se añade a `PRIMARY_WORKS`.
+
+### A18 · El razonamiento cuenta como salida: 8 192 tokens no bastan para un borrador
+
+**Descubierto en:** N8 (primer borrador real, C8, `llm_calls` id 83). Con
+`max_tokens=8192`, DeepSeek cortó la respuesta (`finish_reason=length`) a los 33 s. Con
+32 768, el mismo borrador gastó **10 274 tokens de salida** (id 84) para unas ~1 500
+palabras de JSON. El razonamiento (`reasoning_content`) cuenta dentro de `max_tokens`, igual
+que en las sub-consultas de N7 (C8: 3 459 tokens para 12 frases).
+**Cambios:** `deepseek_max_tokens_synthesis = 32768` (etiquetado sigue en 4 096). Un
+`finish_reason=length` levanta ahora `LLMOutputError` con el desglose (`prompt_tokens`,
+`completion_tokens`, `reasoning_tokens`, longitudes del contenido y del razonamiento), y ese
+mensaje queda en `llm_calls.error`. Antes habría sido un «JSON inválido» sin causa visible.
+El límite de 384K de salida de la serie V4 viene de fuentes de terceros, no de la
+documentación oficial; no se ha probado por encima de 32 768.
+
+### A19 · `stance` no se poblaba porque el prompt lo impedía, no porque el modelo no viera la crítica
+
+**Descubierto en:** N8 (comparación de modelos en C8 y C3, 2026-10-03, `llm_calls` ids 85–88).
+**Medido: 0 `contradicts` y 0 `mentions` en 56 claims**, con los dos modelos (C8: 14 de flash
+y 13 de v4-pro; C3: 15 y 14). El material crítico se había recuperado bien por tema: 15
+pasajes de Espinosa (*Íconos* 43, 2012) entre los candidatos de C3, incluida su crítica a la
+tesis de la «forma natural» (A14). Es decir, **L2/X4 funcionaba**. Los modelos sí leían la
+crítica: v4-pro la recogió en tres claims (#27, #29, #38) y flash en uno (#27). Pero la
+regla de atribución de A17 («nombra a quién atribuyes cada tesis») la convertía en «Espinosa
+critica la tesis de Echeverría…» con `supports`. Eso es correcto, porque el pasaje sí
+respalda que Espinosa critica, pero hace `contradicts` **inalcanzable por construcción**: un
+pasaje de X siempre respalda «X dice Y». El prompt solo *permitía* la vía alternativa, y
+ningún modelo la tomó.
+**Corrección:** la regla «Tesis discutidas» es ahora obligatoria. Cuando un pasaje discute
+una tesis, el borrador emite **dos claims con el mismo texto de tesis**: uno cita los pasajes
+que la exponen (`supports`) y el otro los que la discuten (`contradicts`). Ambos atribuyen la
+tesis a quien la sostiene y nombran entre paréntesis a los autores de los pasajes citados.
+El disenso va en `stance`, no en la frase; «X critica Y» con `supports` queda prohibido.
+**Validado** (C3, v4-pro, id 89): #27 y #29 salen como `contradicts` frente a «Echeverría
+sostiene que el barroco privilegió la "forma natural" de la vida…» (supports: #3, #5, #15),
+y #38 como `contradicts` frente a la tesis del mestizaje intrínseco al barroco (supports:
+#37 y Artunduaga #11). Resultado: 12 claims, 10 `supports` y 2 `contradicts`.
+**Fuga residual:** el claim 12 (Carrión, «dimensiones que no habrían sido suficientemente
+consideradas por Echeverría») sigue llevando el disenso en la frase, con `supports`.
+`mentions` sigue en 0. Se revisará en N10.
+**Coste de la corrección:** 20 972 tokens de salida y 191 s, frente a 14 820 y 131 s con el
+prompt anterior. Cabe en `max_tokens=32768` (A18), pero el margen se ha reducido.
+
+### A20 · Comparación de modelos para síntesis: `deepseek-v4-pro`
+
+**Descubierto en:** N8 (C8 y C3, una llamada por modelo y clúster, ids 85–88, prompt anterior
+a A19). Tres medidas:
+
+| Medida | deepseek-flash | deepseek-v4-pro |
+|---|---|---|
+| Atribución: claims que nombran al autor del pasaje citado (C8 / C3) | 6/14 / 15/15 | 13/13 / 14/14 |
+| Detección de crítica: pasajes críticos de Espinosa recogidos en algún claim (C3) | 1 (#27) | 3 (#27, #29, #38) |
+| Transcripción: mediana de 5-gramas del claim que aparecen tal cual en su pasaje (C3) | 33 % (12/15 claims ≥ 30 %; peor 66 %) | 4,5 % (0/14 ≥ 30 %) |
+| Coste C8: tokens de entrada / salida, tiempo | 7 232 / 9 205, 35 s | 7 283 / 10 009, 89 s |
+| Coste C3: tokens de entrada / salida, tiempo | 14 711 / 9 397, 36 s | 14 762 / 14 820, 131 s |
+
+La atribución de flash no es estable entre clústeres (6/14 en C8 y 15/15 en C3); la de
+v4-pro sí. v4-pro sintetiza combinando fuentes, mientras flash tiende a transcribir el
+pasaje. Su baja copia literal se comprobó a mano en los claims 7 y 8 (contra #29 y #38):
+son fieles.
+**Decisión:** `deepseek-v4-pro` para síntesis (`deepseek_model_synthesis`, por defecto en
+`Settings`). **`deepseek-flash` se queda para etiquetado** (`deepseek_model`).
+**Límite de la medida:** una sola muestra por modelo y clúster. Como `coherent` en A13,
+estos juicios pueden variar entre corridas. La decisión se apoya en que las tres medidas
+apuntan en la misma dirección, no en ninguna cifra aislada. No se compararon precios por
+token.
 
 ---
 
@@ -509,7 +613,7 @@ la bibliografía (fase 05).
 | N5 | Etiquetado LLM | ✅ 2026-10-01 · `data/cluster_labels.json` (C0–C8, Gemini) · test slow OK con DeepSeek (9/9, 22 805 tokens) · 264 tests (+8 slow) · hallazgos A10–A13, decisión X6‴ |
 | N6 | Modelos C3/C4/C5 | ✅ 2026-10-01 · `expertos/models.py` (campos 1:1 con C3/C4/C5, verificados también contra el documento de contratos) + `expertos/persistence.py` (escritura atómica) · 323 tests (+8 slow) · comportamientos deliberados C1–C4 (sección C) |
 | N7 | Síntesis 1/2: sub-consultas | ✅ 2026-10-03 · `expertos/synthesis.py` (sub-consultas → retrieval por partición → candidatos) + CLI `synthesis retrieve` · `EXPERTOS_DEEPSEEK_MODEL_SYNTHESIS` · 9/9 clústeres en `data/synthesis/_retrieval/` (27 567 tokens) · 343 tests (+9 slow) · test slow OK · comportamientos C5–C8, hallazgos A14–A17 |
-| N8 | Síntesis 2/2: claims validadas | ⬜ |
+| N8 | Síntesis 2/2: claims validadas | ✅ 2026-10-03 · `draft_claims` + CLI `synthesis draft` · `PRIMARY_WORKS` (4 papers) · stance por pares de tesis, validado en C3 (#27, #29, #38 → contradicts) · síntesis con `deepseek-v4-pro`, `max_tokens=32768` · 359 tests (+10 slow) · test slow OK · hallazgos A17 (censo), A18–A20 |
 | N9 | Corrida completa de síntesis | ⬜ |
 | N10 | Muestreo de 10 claims | ⬜ |
 | N11 | SynthesisMap | ⬜ |

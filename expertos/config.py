@@ -24,8 +24,13 @@ class Settings(BaseSettings):
     model_label: str
     deepseek_api_key: SecretStr | None = None
     deepseek_model: str | None = None  # etiquetado (N5)
-    # Síntesis (N7–N9) con modelo propio: probar otro (p. ej. deepseek-v4-pro en N8) no toca el de etiquetado.
-    deepseek_model_synthesis: str = "deepseek-flash"
+    # Síntesis (N7–N9) con modelo propio, separado del de etiquetado. v4-pro por la comparación de N8 (A20).
+    deepseek_model_synthesis: str = "deepseek-v4-pro"
+    # El modelo razona y el razonamiento cuenta como salida (C8 de N7: 3 459 tokens para 12 frases);
+    # un borrador de N8 (summary 300–800 palabras + claims) no cabe en los 4 096 del etiquetado.
+    # 8192 se quedó corto en el primer borrador real (C8, `llm_calls` id 83). Las fuentes consultadas
+    # (de terceros, no la documentación oficial) dan hasta 384K de salida para la serie V4.
+    deepseek_max_tokens_synthesis: int = 32768
     deepseek_base_url: str = "https://api.deepseek.com"
     llm_rpm_synthesis: int = 2
     llm_rpm_label: int = 10

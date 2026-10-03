@@ -8,12 +8,14 @@ Uso:
     python -m expertos cluster label [--expert-id C8] [--run-id ...]
     python -m expertos cluster merge --from C8 --into C0
     python -m expertos synthesis retrieve [--expert-id C3] [--run-id ...]
+    python -m expertos synthesis draft [--expert-id C8] [--run-id ...] [--out-dir ...]
 """
 
 from __future__ import annotations
 
 import hashlib
 import logging
+from pathlib import Path
 
 import typer
 
@@ -33,7 +35,13 @@ from expertos.config import Settings
 from expertos.inspection import dump_clusters
 from expertos.labeling import label_all_clusters, label_cluster, load_labels, update_labels
 from expertos.llm import LLMOutputError, make_client
-from expertos.synthesis import retrieval_path, run_expert_retrieval
+from expertos.persistence import load_synthesis
+from expertos.synthesis import (
+    NoValidClaimsError,
+    retrieval_path,
+    run_expert_draft,
+    run_expert_retrieval,
+)
 from expertos.vectors import (
     build_representative_vectors,
     get_indexed_paper_ids,
@@ -261,6 +269,70 @@ def synthesis_retrieve(
     typer.echo(f"{len(todo) - len(failed)} clústeres procesados, {skipped} ya existentes [{run_id}]")
     if failed:
         typer.echo(f"Sin sub-consultas (reintentar con --expert-id): {', '.join(failed)}", err=True)
+        raise typer.Exit(1)
+
+
+@synthesis_app.command("draft")
+def synthesis_draft(
+    expert_id: str | None = typer.Option(None, "--expert-id", help="Redactar solo este clúster (p. ej. C8)."),
+    run_id: str | None = typer.Option(None, "--run-id", help="Por defecto, `cluster_run_id` de Settings."),
+    out_dir: Path | None = typer.Option(
+        None, "--out-dir", help="Dónde guardar síntesis y auditoría (por defecto `synthesis_dir`). El retrieval se lee siempre de `synthesis_dir`."
+    ),
+) -> None:
+    """Claims validadas (1 llamada LLM por clúster) desde `synthesis_dir/_retrieval/` → síntesis C3 + `_draft/`.
+
+    Sin `--expert-id`, omite los clústeres que ya tienen síntesis en el directorio de salida;
+    con `--expert-id`, la regenera siempre.
+    """
+    _configure_logging()
+    settings = Settings()
+    run_id = run_id or settings.cluster_run_id
+    _check_run_id_matches_vectors(run_id, settings)
+    out_dir = out_dir or settings.synthesis_dir
+
+    labels = load_labels(settings.cluster_labels_path, run_id)
+    expected = sorted(set(load_corpus_assignment(settings.db_path, run_id).values()), key=lambda e: int(e[1:]))
+    if expert_id is not None:
+        if expert_id not in expected:
+            typer.echo(f"{expert_id} no está en clusters[run_id={run_id}]", err=True)
+            raise typer.Exit(1)
+        todo = [expert_id]
+    else:
+        todo = [eid for eid in expected if load_synthesis(eid, synthesis_dir=out_dir) is None]
+    missing = [eid for eid in todo if eid not in labels or not retrieval_path(eid, synthesis_dir=settings.synthesis_dir).exists()]
+    if missing:
+        typer.echo(f"Sin etiqueta o sin retrieval (correr N7): {', '.join(missing)}", err=True)
+        raise typer.Exit(1)
+
+    llm_client = make_client("synthesis", settings)
+    storage = Storage(settings.db_path)
+    failed = []
+    for eid in todo:
+        try:
+            result = run_expert_draft(
+                eid,
+                llm_client,
+                run_id=run_id,
+                label=labels[eid],
+                excavador_storage=storage,
+                synthesis_dir=settings.synthesis_dir,
+                out_dir=out_dir,
+            )
+        except (LLMOutputError, NoValidClaimsError) as exc:
+            logging.getLogger(__name__).warning("%s sin síntesis: %s", eid, exc)
+            failed.append(eid)
+            continue
+        s, audit = result
+        stances = {st: sum(1 for c in s.key_claims if c.stance == st) for st in ("supports", "contradicts", "mentions")}
+        typer.echo(
+            f"{eid} [{audit.llm_model}]: {audit.n_kept}/{audit.n_proposed} claims válidas, "
+            f"{len(audit.discarded)} descartadas, stance {stances}, "
+            f"{len(audit.primary_work_flags)} marcas de obra primaria, summary {len(s.summary.split())} palabras → {out_dir}"
+        )
+    typer.echo(f"{len(todo) - len(failed)} síntesis redactadas [{run_id}]")
+    if failed:
+        typer.echo(f"Sin síntesis (reintentar con --expert-id): {', '.join(failed)}", err=True)
         raise typer.Exit(1)
 
 

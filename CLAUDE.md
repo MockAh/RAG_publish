@@ -11,7 +11,7 @@ Orquestador/Redactor/Verificador (05).
 
 ## Estado actual
 
-Fase 04, micro-tarea N7 firmada, N8 pendiente. N0–N7 firmadas. 155 papers únicos en
+Fase 04, micro-tarea N8 firmada, N9 pendiente. N0–N8 firmadas. 155 papers únicos en
 data/expert_vectors.npz (3 DOI-variante colapsados, ver A5/A6/E3 del registro). k=9
 elegido por inspección humana (A7/A8); asignación en la tabla `clusters` de
 data/excavador.db, run_id `kmeans-k9-seed42-98b2c308` (sufijo = SHA-256[:8] de
@@ -29,7 +29,12 @@ abstract).
 A17: `doi:10.29166/economia.v70i111.1393` (C1) es *El capital* de Marx traducido por
 Echeverría — obra primaria, no estudio; no excluir, pero atribuir a Marx (E5).
 Modelo de síntesis aparte: `EXPERTOS_DEEPSEEK_MODEL_SYNTHESIS` (defecto `deepseek-flash`).
-N8 (síntesis 2/2: claims validadas) no ha empezado — pedir el prompt antes de escribir código.
+Claims validadas en `expertos/synthesis.py` (N8): `draft_claims` + CLI `synthesis draft`;
+`PRIMARY_WORKS` en `expertos/assignments.py` (A17); stance por pares de tesis (A19);
+síntesis con `deepseek-v4-pro` (A20). Ninguna síntesis de producción escrita aún:
+`data/synthesis/{expert_id}.json` lo llena N9. Las comparaciones de N8 están en
+`data/synthesis_cmp/` (fuera de git), solo como material de consulta.
+N9 (corrida completa de síntesis) no ha empezado — pedir el prompt antes de escribir código.
 Repo: `~/WandaVision/RAG_publish`, rama `main` (ver plan para N0–N14).
 
 Paquetes previos, YA FIRMADOS, no modificar sin causa documentada (precedente en el
@@ -78,8 +83,10 @@ registro de fase 02, sección B): `excavador/`, `biblioteca/`.
 `_LoggedLLMClient` (cliente agnóstico — X8).
 
 - **DeepSeek** (`DeepSeekClient`, httpx directo): `.env` con `EXPERTOS_LLM_PROVIDER=deepseek`,
-  `EXPERTOS_DEEPSEEK_API_KEY`, `EXPERTOS_DEEPSEEK_MODEL=deepseek-flash` (el mismo para
-  ambas tareas). Solo `response_format=json_object`: el schema viaja en el prompt de
+  `EXPERTOS_DEEPSEEK_API_KEY`, `EXPERTOS_DEEPSEEK_MODEL=deepseek-flash` (etiquetado).
+  **Síntesis: `deepseek-v4-pro`** (`EXPERTOS_DEEPSEEK_MODEL_SYNTHESIS`, por defecto en
+  `Settings`; A20), con `max_tokens=32768` porque el razonamiento cuenta como salida (A18).
+  Solo `response_format=json_object`: el schema viaja en el prompt de
   sistema. Prepago: **402 = sin saldo**, no se reintenta. Las docs no declaran RPM ni cuota
   diaria (no verificado bajo carga); el rate limiter propio sigue en `llm_rpm_<task>`.
   Coste medido: etiquetar los 9 clústeres = 22 805 tokens, 103 s, cero reintentos.
@@ -97,29 +104,26 @@ Toda llamada, éxito o fallo, se registra en la tabla SQLite `llm_calls`
 (`data/excavador.db`), con `provider` y `context` (JSON: para qué era la llamada).
 Diagnóstico tras un fallo: leer `llm_calls.error`, nunca relanzar (F5).
 
-## Tarea en curso: N7 — Síntesis 1/2: sub-consultas y retrieval por partición
+## Tarea en curso: N8 — Síntesis 2/2: claims validadas
 
-Objetivo (fila N7 del plan; X3, X4, X7; L1/L2/L3 de la herencia de fase 03). Dos fases
-separadas: el LLM genera sub-consultas, el código recupera. La redacción de claims es N8:
-no mezclarlas.
+Objetivo (fila N8 del plan; X3, X4, X7; A14–A17 del registro). Entrada: los
+`data/synthesis/_retrieval/{expert_id}.json` de N7. N8 no llama al retrieval ni regenera
+sub-consultas.
 
-- Settings: `EXPERTOS_DEEPSEEK_MODEL_SYNTHESIS` (por defecto `deepseek-flash`), separado del
-  modelo de etiquetado, para probar `deepseek-v4-pro` en N8 sin tocar código.
-- `expertos/synthesis.py`:
-  - `generate_subqueries(expert_id, label, papers, llm_client, n_min=8, n_max=12)`: UNA
-    llamada; prompt con topic_label, one_liner, keywords y títulos representativos. Frases de
-    contenido para búsqueda semántica, no preguntas retóricas; nunca pedir críticas o
-    contradicciones (L2); ángulos complementarios. Schema `SubQueries(queries)` rechaza
-    fuera de [n_min, n_max] y duplicados exactos.
-  - `retrieve_for_expert(...)`: `chunk_store.retrieve` por sub-consulta con
-    `filter_paper_ids` = partición del clúster (tabla `clusters` + stoplist E4). Sin LLM.
-  - `collect_candidate_chunks(retrieved)`: une por `chunk_id`, mejor score, registra las
-    consultas que lo trajeron. **Sin filtrar por score** (L1).
-  - Persistencia atómica en `data/synthesis/_retrieval/{expert_id}.json` (sub-consultas,
-    chunks con score y `from_abstract`): N8 parte de ahí sin repetir retrieval ni LLM.
-- CLI: `python -m expertos synthesis retrieve [--expert-id Cn]`.
+- `draft_claims(expert_id, label, candidates, llm_client)`: una llamada; el prompt lleva cada
+  chunk con `chunk_id`, `paper_id`, autor, año y si es `from_abstract`. Devuelve `summary`
+  (300–800 palabras) y `key_claims` (C3). Reglas del prompt: solo ids de la lista; atribución
+  por autoría, no por tema (A17); `stance` leyendo cada pasaje (X4), sin `supports` por
+  defecto; PDF antes que abstract (X7); pasajes sin sentido gramatical no se usan (E6 de 03).
+- `PRIMARY_WORKS` (`expertos/assignments.py`, mismo patrón que la stoplist E4): 4 papers
+  cuyo texto no es de quien dice `authors`. Su `real_author` sustituye a `authors` en el
+  prompt, junto con su `attribution_note`.
+- Validación en código: `supporting_chunks ⊆ recuperados`. Una claim con un id ajeno se
+  descarta entera, no se repara (X3), y se cuentan las descartadas. Una claim que cita
+  `PRIMARY_WORKS` no se descarta: se marca en el archivo de auditoría para N10.
+- Persistencia con `save_synthesis` (N6). CLI: `python -m expertos synthesis draft [--expert-id Cn]`.
 
-Hecho cuando: tests en verde (una sola llamada; bounds y duplicados; filtro = partición sin
-stoplist; dedup con mejor score y ambas consultas; round-trip del archivo), test `slow` con
-un clúster real (1 llamada), clúster real procesado desde la raíz, commit
-`N7: sub-consultas y retrieval por partición` + push.
+Hecho cuando: tests en verde (id ajeno descartado, vacío rechazado, los tres `stance`
+persistidos, autor y año en el prompt, sustitución por `real_author`, round-trip), test `slow`
+con un clúster, y **parar antes de los 9**: C8 con `deepseek-flash` y con `deepseek-v4-pro`,
+claims de ambos al usuario. De esa comparación sale el modelo de N9.

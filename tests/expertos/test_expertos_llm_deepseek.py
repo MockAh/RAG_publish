@@ -295,7 +295,8 @@ def test_make_client_deepseek_uses_deepseek_model_and_task_rpm(
     synthesis = make_client("synthesis", settings)
 
     assert isinstance(label, DeepSeekClient) and isinstance(synthesis, DeepSeekClient)
-    assert label.model == synthesis.model == "deepseek-flash"
+    assert label.model == "deepseek-flash"
+    assert synthesis.model == "deepseek-v4-pro"  # A20
     assert label.min_interval_s == 6.0
     assert synthesis.min_interval_s == 30.0
 
@@ -362,7 +363,32 @@ def test_make_client_deepseek_synthesis_model_is_separate_from_label(
     assert make_client("synthesis", settings).model == "deepseek-v4-pro"
 
 
-def test_deepseek_model_synthesis_defaults_to_flash(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_deepseek_model_synthesis_defaults_to_v4_pro(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A20: v4-pro para síntesis; el etiquetado sigue en `deepseek_model`."""
     monkeypatch.chdir(tmp_path)  # cwd sin .env: no hereda config del repo
 
-    assert _settings(tmp_path).deepseek_model_synthesis == "deepseek-flash"
+    assert _settings(tmp_path).deepseek_model_synthesis == "deepseek-v4-pro"
+
+
+def test_truncated_response_raises_explicit_error_and_is_logged(httpx_mock, tmp_path: Path) -> None:
+    """`finish_reason=length` (N8): error que nombra `max_tokens`, no un «JSON inválido» opaco."""
+    body = {
+        "choices": [{"index": 0, "message": {"role": "assistant", "content": '{"ok": tr'}, "finish_reason": "length"}],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 4096},
+    }
+    httpx_mock.add_response(url=URL, method="POST", json=body)
+
+    with pytest.raises(LLMOutputError, match="max_tokens=4096"):
+        _client(tmp_path).complete_json("system", "user", Ping)
+
+    [(ok, error)] = _rows(tmp_path, "ok, error")
+    assert ok == 0 and "truncada" in error
+    assert "content_chars=9" in error and "reasoning_tokens=None" in error
+
+
+def test_make_client_synthesis_uses_its_own_max_tokens(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)  # cwd sin .env: no hereda config del repo
+    settings = _settings(tmp_path, llm_provider="deepseek", deepseek_api_key="sk-fake", deepseek_model="deepseek-flash")
+
+    assert make_client("synthesis", settings).max_tokens == 32768
+    assert make_client("label", settings).max_tokens == 4096

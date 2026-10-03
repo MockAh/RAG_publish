@@ -23,6 +23,7 @@ from __future__ import annotations
 import hashlib
 import sqlite3
 from pathlib import Path
+from typing import NamedTuple
 
 import numpy as np
 
@@ -31,6 +32,51 @@ import numpy as np
 # (American Journal of Physical Anthropology, metilación de ADN en dientes). Su
 # vector se construyó con ese abstract ajeno, así que no representa nada real.
 EXCLUDED_PAPER_IDS: frozenset[str] = frozenset({"doi:10.1002/ajpa.22921"})
+
+
+class PrimaryWork(NamedTuple):
+    """Quién escribió de verdad el texto indexado de un paper, cuando `authors` no lo dice."""
+
+    real_author: str
+    attribution_note: str
+
+
+# A17 (registro de fase 04): papers cuyo texto indexado no es de quien figura en `authors`.
+# No se excluyen —citarlos puede ser correcto—, pero `real_author` sustituye a `authors` en el
+# prompt de síntesis (N8) y toda claim que los cite queda marcada para revisión manual (N10).
+# Lista cerrada, salida de un censo heurístico leyendo chunks: si N10 encuentra otro, se añade aquí.
+PRIMARY_WORKS: dict[str, PrimaryWork] = {
+    "doi:10.29166/economia.v70i111.1393": PrimaryWork(
+        real_author="Karl Marx",
+        attribution_note=(
+            "Texto de Marx: El capital, Libro I, capítulo I («La mercancía»), en la traducción de "
+            "Bolívar Echeverría (1976), republicada en 2018. Es palabra de Marx, no de Echeverría "
+            "ni de un comentarista."
+        ),
+    ),
+    "doi:10.22201/cisan.24487228e.2009.01.37": PrimaryWork(
+        real_author="Bolívar Echeverría (entrevistado)",
+        attribution_note=(
+            "Entrevista de 2009: las respuestas son palabras de Echeverría; las preguntas, de los "
+            "entrevistadores (Díaz de la Serna, Valdés Ugalde, Sigüenza Reyes), que son quienes figuran "
+            "como autores en los metadatos."
+        ),
+    ),
+    "doi:10.17141/iconos.17.2003.502": PrimaryWork(
+        real_author="Bolívar Echeverría (entrevistado)",
+        attribution_note=(
+            "Diálogo de 2003: las respuestas son palabras de Echeverría; las preguntas y la presentación, "
+            "de los entrevistadores (Figueroa, Cerbino), que son quienes figuran como autores en los metadatos."
+        ),
+    ),
+    "openalex:W1675963835": PrimaryWork(
+        real_author="Laura Romero (nota de prensa)",
+        attribution_note=(
+            "Nota de prensa de la UNAM sobre el premio a Vuelta de siglo (2007). Parafrasea a Echeverría: "
+            "no son sus palabras, aunque los metadatos lo incluyan como autor."
+        ),
+    ),
+}
 
 _CREATE_CLUSTERS = """
 CREATE TABLE IF NOT EXISTS clusters (

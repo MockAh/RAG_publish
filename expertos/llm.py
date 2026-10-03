@@ -294,7 +294,21 @@ class DeepSeekClient(_LoggedLLMClient):
             )
         data = response.json()
         usage = data.get("usage") or {}
-        text = data["choices"][0]["message"].get("content") or ""
+        choice = data["choices"][0]
+        if choice.get("finish_reason") == "length":
+            # JSON cortado a medias: sin esto, el error sería un «JSON inválido» que no dice por qué.
+            # El razonamiento (`reasoning_content`) cuenta dentro de `max_tokens`: el desglose dice
+            # si se fue en pensar o en un contenido desbocado.
+            message = choice.get("message") or {}
+            details = usage.get("completion_tokens_details") or {}
+            raise LLMOutputError(
+                f"respuesta truncada por max_tokens={self.max_tokens} "
+                f"(prompt_tokens={usage.get('prompt_tokens')}, completion_tokens={usage.get('completion_tokens')}, "
+                f"reasoning_tokens={details.get('reasoning_tokens')}, "
+                f"content_chars={len(message.get('content') or '')}, "
+                f"reasoning_chars={len(message.get('reasoning_content') or '')})"
+            )
+        text = choice["message"].get("content") or ""
         return text, _to_native_int(usage.get("prompt_tokens")), _to_native_int(usage.get("completion_tokens"))
 
 
@@ -302,7 +316,8 @@ def make_client(task: str, settings: Settings) -> GeminiClient | DeepSeekClient:
     """Cliente del proveedor de `settings.llm_provider` para `task` ("label" | "synthesis").
 
     `task` elige el RPM (`llm_rpm_<task>`) y el modelo: con Gemini, `model_<task>`; con
-    DeepSeek, `deepseek_model` para "label" y `deepseek_model_synthesis` para "synthesis".
+    DeepSeek, `deepseek_model` para "label" y `deepseek_model_synthesis` para "synthesis" (esta
+    última con `deepseek_max_tokens_synthesis`).
     Registra en `llm_calls` de `db_path`.
     """
     if task not in ("label", "synthesis"):
@@ -317,6 +332,7 @@ def make_client(task: str, settings: Settings) -> GeminiClient | DeepSeekClient:
             db_path=settings.db_path,
             max_retries=settings.llm_max_retries,
             base_url=settings.deepseek_base_url,
+            **({"max_tokens": settings.deepseek_max_tokens_synthesis} if task == "synthesis" else {}),
         )
     return GeminiClient(
         api_key=settings.gemini_api_key.get_secret_value(),
