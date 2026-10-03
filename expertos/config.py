@@ -23,7 +23,9 @@ class Settings(BaseSettings):
     model_synthesis: str
     model_label: str
     deepseek_api_key: SecretStr | None = None
-    deepseek_model: str | None = None
+    deepseek_model: str | None = None  # etiquetado (N5)
+    # Síntesis (N7–N9) con modelo propio: probar otro (p. ej. deepseek-v4-pro en N8) no toca el de etiquetado.
+    deepseek_model_synthesis: str = "deepseek-flash"
     deepseek_base_url: str = "https://api.deepseek.com"
     llm_rpm_synthesis: int = 2
     llm_rpm_label: int = 10
@@ -40,6 +42,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "llm_provider", "gemini_api_key", "model_synthesis", "model_label", "deepseek_api_key", "deepseek_model",
+        "deepseek_model_synthesis",
         mode="before",
     )
     @classmethod

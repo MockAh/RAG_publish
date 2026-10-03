@@ -300,6 +300,26 @@ la bibliografía (fase 05).
 - **C4 · Las funciones de persistencia reciben la ruta como argumento keyword**
   (`synthesis_dir=`, `path=`), no leen `Settings` por dentro: mismo patrón que
   `save_labels` / `db_path`, y los tests no dependen del `.env`.
+- **C5 · Partición vacía = error, no «sin filtro»** (N7). `ChunkStore.retrieve` traduce
+  `filter_paper_ids=[]` a ningún `where`, es decir, a todo el corpus. `retrieve_for_expert`
+  levanta `ValueError` antes de llamar al store, y además rechaza cualquier chunk devuelto
+  fuera de la partición.
+- **C6 · `CandidateChunk` extiende `ScoredChunk` con `queries`; `RetrievalRecord` guarda el
+  texto de cada chunk** (N7). Modelos internos de fase 04, no contrato. N8 redacta desde
+  `data/synthesis/_retrieval/{expert_id}.json` sin volver al LLM ni a Chroma. Ningún
+  candidato se descarta por score (L1); los `from_abstract` se conservan y la preferencia
+  por PDF (X7) es tarea del prompt de N8.
+- **C7 · `synthesis retrieve` sin `--expert-id` omite los clústeres con archivo ya escrito;
+  con `--expert-id` regenera siempre** (N7). Mismo criterio que `skip_existing` de N5: una
+  corrida cortada se reanuda gastando solo las llamadas que faltan.
+- **C8 · Primera corrida real (C3, DeepSeek `deepseek-flash`)** (N7): 12 sub-consultas,
+  96 aciertos brutos (12 × top_k 8) → 46 candidatos únicos (21 traídos por más de una
+  consulta), 39 de PDF, 10 de los 12 papers de la partición, score 0.805–0.888 (por debajo
+  de la banda L1: confirma que un umbral habría recortado material sin criterio). Coste:
+  ~1 000 tokens de entrada + 1 000–1 500 de salida por llamada (`llm_calls`, `context.task =
+  "synthesis.subqueries"`); presupuesto de N7 para los 9 clústeres ≈ 9 llamadas ≈ 20 000
+  tokens (dato para D2). Una sub-consulta derivó a un subtema marginal del clúster («ethos
+  corporativo»): no se filtra; N8 decidirá leyendo si aporta.
 
 ## D · Verificaciones pospuestas
 
@@ -388,7 +408,7 @@ la bibliografía (fase 05).
 | N4 | Inspección humana; elegir k | ✅ 2026-09-26 · k=9, seed=42, por inspección (A8) · `clusters` run_id `kmeans-k9-seed42-98b2c308` (155 filas) · 212 tests (+7 slow) · hallazgos A8–A9, B2, E4 |
 | N5 | Etiquetado LLM | ✅ 2026-10-01 · `data/cluster_labels.json` (C0–C8, Gemini) · test slow OK con DeepSeek (9/9, 22 805 tokens) · 264 tests (+8 slow) · hallazgos A10–A13, decisión X6‴ |
 | N6 | Modelos C3/C4/C5 | ✅ 2026-10-01 · `expertos/models.py` (campos 1:1 con C3/C4/C5, verificados también contra el documento de contratos) + `expertos/persistence.py` (escritura atómica) · 323 tests (+8 slow) · comportamientos deliberados C1–C4 (sección C) |
-| N7 | Síntesis 1/2: sub-consultas | ⬜ |
+| N7 | Síntesis 1/2: sub-consultas | ✅ 2026-10-03 · `expertos/synthesis.py` (sub-consultas → retrieval por partición → candidatos) + CLI `synthesis retrieve` · `EXPERTOS_DEEPSEEK_MODEL_SYNTHESIS` · C3 procesado (`data/synthesis/_retrieval/C3.json`) · 343 tests (+9 slow) · test slow OK · comportamientos C5–C8 |
 | N8 | Síntesis 2/2: claims validadas | ⬜ |
 | N9 | Corrida completa de síntesis | ⬜ |
 | N10 | Muestreo de 10 claims | ⬜ |

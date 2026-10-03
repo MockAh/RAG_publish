@@ -343,3 +343,26 @@ def test_deepseek_settings_strip_crlf(monkeypatch: pytest.MonkeyPatch, tmp_path:
     assert settings.llm_provider == "deepseek"
     assert settings.deepseek_api_key.get_secret_value() == "sk-fake"
     assert settings.deepseek_model == "deepseek-flash"
+
+
+def test_make_client_deepseek_synthesis_model_is_separate_from_label(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """N7: `deepseek_model_synthesis` cambia solo el modelo de síntesis (p. ej. para probar v4-pro en N8)."""
+    monkeypatch.chdir(tmp_path)  # cwd sin .env: no hereda config del repo
+    settings = _settings(
+        tmp_path,
+        llm_provider="deepseek",
+        deepseek_api_key="sk-fake",
+        deepseek_model="deepseek-flash",
+        deepseek_model_synthesis="deepseek-v4-pro\r",
+    )
+
+    assert make_client("label", settings).model == "deepseek-flash"
+    assert make_client("synthesis", settings).model == "deepseek-v4-pro"
+
+
+def test_deepseek_model_synthesis_defaults_to_flash(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)  # cwd sin .env: no hereda config del repo
+
+    assert _settings(tmp_path).deepseek_model_synthesis == "deepseek-flash"

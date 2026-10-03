@@ -7,6 +7,7 @@ Uso:
     python -m expertos cluster assign --k 9
     python -m expertos cluster label [--expert-id C8] [--run-id ...]
     python -m expertos cluster merge --from C8 --into C0
+    python -m expertos synthesis retrieve [--expert-id C3] [--run-id ...]
 """
 
 from __future__ import annotations
@@ -30,8 +31,9 @@ from expertos.assignments import (
 from expertos.clustering import load_matrix, report, run_hdbscan, sweep_kmeans
 from expertos.config import Settings
 from expertos.inspection import dump_clusters
-from expertos.labeling import label_all_clusters, label_cluster, update_labels
-from expertos.llm import make_client
+from expertos.labeling import label_all_clusters, label_cluster, load_labels, update_labels
+from expertos.llm import LLMOutputError, make_client
+from expertos.synthesis import retrieval_path, run_expert_retrieval
 from expertos.vectors import (
     build_representative_vectors,
     get_indexed_paper_ids,
@@ -45,6 +47,8 @@ vectors_app = typer.Typer()
 app.add_typer(vectors_app, name="vectors")
 cluster_app = typer.Typer()
 app.add_typer(cluster_app, name="cluster")
+synthesis_app = typer.Typer()
+app.add_typer(synthesis_app, name="synthesis")
 
 _NOISY_LOGGERS = (
     "httpx",
@@ -63,6 +67,18 @@ def _configure_logging() -> None:
     )
     for logger_name in _NOISY_LOGGERS:
         logging.getLogger(logger_name).setLevel(logging.WARNING)
+
+
+def _check_run_id_matches_vectors(run_id: str, settings: Settings) -> None:
+    """Sale con error si `run_id` no corresponde a `expert_vectors_path`.
+
+    El sufijo del run_id base ata la partición a los vectores (A8): con otros vectores, el centroide
+    mentiría. Una corrida derivada (`<base>+merge-…`) hereda el hash de su base.
+    """
+    vectors_hash = hashlib.sha256(settings.expert_vectors_path.read_bytes()).hexdigest()[:8]
+    if not run_id.split("+", 1)[0].endswith(f"-{vectors_hash}"):
+        typer.echo(f"{run_id} no corresponde a {settings.expert_vectors_path} (hash {vectors_hash})", err=True)
+        raise typer.Exit(1)
 
 
 @vectors_app.command("build")
@@ -134,12 +150,7 @@ def cluster_label(
     _configure_logging()
     settings = Settings()
     run_id = run_id or settings.cluster_run_id
-    # El sufijo del run_id base ata la partición a los vectores (A8): con otros vectores, el centroide
-    # mentiría. Una corrida derivada (`<base>+merge-…`) hereda el hash de su base.
-    vectors_hash = hashlib.sha256(settings.expert_vectors_path.read_bytes()).hexdigest()[:8]
-    if not run_id.split("+", 1)[0].endswith(f"-{vectors_hash}"):
-        typer.echo(f"{run_id} no corresponde a {settings.expert_vectors_path} (hash {vectors_hash})", err=True)
-        raise typer.Exit(1)
+    _check_run_id_matches_vectors(run_id, settings)
 
     context = dict(
         run_id=run_id,
@@ -188,6 +199,69 @@ def cluster_merge(
         f"{derived}: {len(set(corpus.values()))} clústeres; {target} = {n_target} papers "
         f"({n_corpus} tras la stoplist)"
     )
+
+
+@synthesis_app.command("retrieve")
+def synthesis_retrieve(
+    expert_id: str | None = typer.Option(None, "--expert-id", help="Procesar solo este clúster (p. ej. C3)."),
+    run_id: str | None = typer.Option(None, "--run-id", help="Por defecto, `cluster_run_id` de Settings."),
+) -> None:
+    """Sub-consultas (1 llamada LLM por clúster) y retrieval sobre la partición → `synthesis_dir/_retrieval/`.
+
+    Sin `--expert-id`, omite los clústeres que ya tienen archivo de retrieval (reanudar tras un fallo
+    gasta solo las llamadas que faltan); con `--expert-id`, lo regenera siempre.
+    """
+    _configure_logging()
+    settings = Settings()
+    run_id = run_id or settings.cluster_run_id
+    _check_run_id_matches_vectors(run_id, settings)
+
+    labels = load_labels(settings.cluster_labels_path, run_id)
+    expected = sorted(set(load_corpus_assignment(settings.db_path, run_id).values()), key=lambda e: int(e[1:]))
+    if expert_id is not None:
+        if expert_id not in expected:
+            typer.echo(f"{expert_id} no está en clusters[run_id={run_id}]", err=True)
+            raise typer.Exit(1)
+        todo = [expert_id]
+    else:
+        todo = [eid for eid in expected if not retrieval_path(eid, synthesis_dir=settings.synthesis_dir).exists()]
+    unlabeled = [eid for eid in todo if eid not in labels]
+    if unlabeled:
+        typer.echo(f"Sin etiqueta en {settings.cluster_labels_path} [{run_id}]: {', '.join(unlabeled)}", err=True)
+        raise typer.Exit(1)
+
+    llm_client = make_client("synthesis", settings)
+    chunk_store = ChunkStore(settings.chroma_dir)
+    context = dict(
+        run_id=run_id,
+        vectors=load_vectors(settings.expert_vectors_path),
+        db_path=settings.db_path,
+        excavador_storage=Storage(settings.db_path),
+        synthesis_dir=settings.synthesis_dir,
+    )
+    failed = []
+    for eid in todo:
+        try:
+            record = run_expert_retrieval(eid, llm_client, chunk_store, label=labels[eid], **context)
+        except LLMOutputError as exc:
+            logging.getLogger(__name__).warning("%s sin sub-consultas válidas: %s", eid, exc)
+            failed.append(eid)
+            continue
+        n_pdf = sum(1 for c in record.candidates if not c.from_abstract)
+        scores = [c.score for c in record.candidates]
+        typer.echo(
+            f"{eid}: {len(record.queries)} sub-consultas, {len(record.candidates)} chunks candidatos "
+            f"({n_pdf} de PDF) de {len({c.chunk.paper_id for c in record.candidates})}/{len(record.paper_ids)} papers, "
+            f"score {min(scores, default=0):.3f}–{max(scores, default=0):.3f} "
+            f"→ {retrieval_path(eid, synthesis_dir=settings.synthesis_dir)}"
+        )
+        for query in record.queries:
+            typer.echo(f"    · {query}")
+    skipped = len(expected) - len(todo) if expert_id is None else 0
+    typer.echo(f"{len(todo) - len(failed)} clústeres procesados, {skipped} ya existentes [{run_id}]")
+    if failed:
+        typer.echo(f"Sin sub-consultas (reintentar con --expert-id): {', '.join(failed)}", err=True)
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":

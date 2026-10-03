@@ -301,8 +301,9 @@ class DeepSeekClient(_LoggedLLMClient):
 def make_client(task: str, settings: Settings) -> GeminiClient | DeepSeekClient:
     """Cliente del proveedor de `settings.llm_provider` para `task` ("label" | "synthesis").
 
-    `task` elige el RPM (`llm_rpm_<task>`) y, con Gemini, el modelo (`model_<task>`);
-    DeepSeek usa `deepseek_model` para ambas tareas. Registra en `llm_calls` de `db_path`.
+    `task` elige el RPM (`llm_rpm_<task>`) y el modelo: con Gemini, `model_<task>`; con
+    DeepSeek, `deepseek_model` para "label" y `deepseek_model_synthesis` para "synthesis".
+    Registra en `llm_calls` de `db_path`.
     """
     if task not in ("label", "synthesis"):
         raise ValueError(f"task desconocida: {task!r} (esperaba 'label' o 'synthesis')")
@@ -311,7 +312,7 @@ def make_client(task: str, settings: Settings) -> GeminiClient | DeepSeekClient:
         assert settings.deepseek_api_key is not None and settings.deepseek_model is not None  # validado en Settings
         return DeepSeekClient(
             api_key=settings.deepseek_api_key.get_secret_value(),
-            model=settings.deepseek_model,
+            model=settings.deepseek_model if task == "label" else settings.deepseek_model_synthesis,
             rpm=rpm,
             db_path=settings.db_path,
             max_retries=settings.llm_max_retries,
