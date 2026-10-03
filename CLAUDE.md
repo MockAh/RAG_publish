@@ -23,8 +23,11 @@ sustituye a las de producción ni se regenera.
 Modelos C3/C4/C5 en `expertos/models.py`, persistencia atómica en `expertos/persistence.py`
 (`data/synthesis_map.json` aún no existe: lo llena N9/N11).
 Sub-consultas y retrieval por partición en `expertos/synthesis.py` (N7, C5–C8 del registro);
-material intermedio en `data/synthesis/_retrieval/{expert_id}.json` — solo C3 generado; el
-resto se genera con `python -m expertos synthesis retrieve` (omite los ya existentes).
+material intermedio en `data/synthesis/_retrieval/{expert_id}.json`, generado para C0–C8
+(A14: hay evidencia válida bajo 0.83; A15: 35 de los 38 papers no cubiertos son de solo
+abstract).
+A17: `doi:10.29166/economia.v70i111.1393` (C1) es *El capital* de Marx traducido por
+Echeverría — obra primaria, no estudio; no excluir, pero atribuir a Marx (E5).
 Modelo de síntesis aparte: `EXPERTOS_DEEPSEEK_MODEL_SYNTHESIS` (defecto `deepseek-flash`).
 N8 (síntesis 2/2: claims validadas) no ha empezado — pedir el prompt antes de escribir código.
 Repo: `~/WandaVision/RAG_publish`, rama `main` (ver plan para N0–N14).

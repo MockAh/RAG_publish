@@ -268,6 +268,108 @@ salida), 103 s, cero reintentos. Frente a Gemini: 17 peticiones para 3 etiquetas
 útiles el 30/09 (A12). El saldo prepago no varió de forma visible (4,33 USD antes y
 después).
 
+### A14 · L1 confirmado por el otro lado: hay evidencia válida por debajo de 0.83
+
+**Descubierto en:** N7 (corrida real de los 9 clústeres, 2026-10-03). **Evidencia propia de
+fase 04, no heredada.** L1 (fase 03) mostró que el ruido puntúa *dentro* de la banda
+0.83–0.90. N7 muestra lo simétrico: material bueno puntúa *por debajo*. En C3 los
+candidatos van de 0.805 a 0.888, y **17 de 46 quedan bajo 0.83**. Leídos uno a uno, los 17
+son pertinentes. Entre ellos está el texto más valioso del clúster para N8: la crítica
+explícita de Carlos Espinosa (*Íconos* 43, 2012, `doi:10.17141/iconos.43.2012.349`) a la
+tesis del barroco como predominio de la «forma natural» («subsisten tres problemas de
+fondo…», 0.813–0.829), recuperada por tema y no por postura (confirma L2 también).
+Los dos de 0.805 (la conclusión de Espinosa y el mestizo colonial en
+`doi:10.15332/25005375.5376`) también son pertinentes.
+El fenómeno no es exclusivo de C3. Candidatos bajo 0.83 por clúster: C0 7/29, C1 2/62,
+C2 8/63, C3 17/46, C4 5/63, C5 6/30, C6 3/76, C7 2/11, C8 10/20 (mínimo global 0.765, C8).
+Solo se leyeron los de C3.
+**Consecuencia:** un umbral en 0.83 habría descartado evidencia válida, incluida la
+única crítica sustantiva del clúster. Ningún filtro por score en N7 ni en N8 (C6).
+
+### A15 · Los papers que el retrieval no alcanza son casi todos de solo abstract
+
+**Descubierto en:** N7 (mismo día). Con 8–12 sub-consultas × `top_k=8`, el retrieval cubre
+**116 de 154 papers**. De los **38 no cubiertos, 35 solo tienen un chunk `from_abstract`**
+(sin PDF indexado). Verificado contra los metadatos de Chroma.
+
+| Clúster | Papers cubiertos | No cubiertos | De ellos, solo abstract |
+|---|---|---|---|
+| C0 | 6/6 | 0 | — |
+| C1 | 16/23 | 7 | 6 |
+| C2 | 22/35 | 13 | 13 |
+| C3 | 10/12 | 2 | 2 |
+| C4 | 21/32 | 11 | 10 |
+| C5 | 11/12 | 1 | 1 |
+| C6 | 15/18 | 3 | 2 |
+| C7 | 11/12 | 1 | 1 |
+| C8 | 4/4 | 0 | — |
+
+Las 3 excepciones tienen PDF y aun así no salieron:
+`doi:10.29166/economia.v70i111.1393` (C1, 130 chunks),
+`doi:10.22201/ffyl.29544270e.2024.46.2092` (C4, 10) y `doi:10.32719/13900102.2024.56.9`
+(C6, 45). La cobertura no excluye por sistema el material de abstract: 64 de los 116
+cubiertos también son de solo abstract, y C7 —un volumen sin PDFs, A9— sale entero de
+abstracts. El mecanismo plausible es la competencia por los 8 puestos de cada consulta: un paper
+con un único chunk tiene un solo boleto, y uno con PDF tiene decenas.
+**Verificado para las 3 excepciones con PDF (2026-10-03, sin LLM): es competencia, no
+exclusión.** Su `paper_id` en `clusters` coincide byte a byte con el de Chroma (sin
+variantes de mayúsculas, prefijo ni espacios), está en la lista de `filter_paper_ids` y
+`has_paper` es `True`. Relanzando las sub-consultas guardadas de cada clúster con
+`top_k=50`, los tres aparecen, aunque en pocas consultas y lejos del corte del puesto 8:
+
+| Paper | Clúster | Consultas que lo traen en top 50 | Mejor puesto | Score / corte #8 |
+|---|---|---|---|---|
+| `doi:10.29166/economia.v70i111.1393` (*El capital. Crítica de la economía política*, 2018) | C1 | 2/11 | 33 | 0.827 / 0.843 |
+| `doi:10.22201/ffyl.29544270e.2024.46.2092` (reseña de *Modernidad barroca y capitalismo*) | C4 | 3/12 | 23 | 0.835 / 0.842 |
+| `doi:10.32719/13900102.2024.56.9` (Echeverría y Benjamin sobre arte) | C6 | 4/12 | 20 | 0.824 / 0.846 |
+
+El de C1 resultó ser obra primaria de Marx, no un estudio sobre Echeverría (A17), lo que
+explica que casi ningún chunk puntúe con sub-consultas sobre Echeverría.
+**Consecuencia para fase 05:** la síntesis de un Experto no habla por toda su partición.
+Un paper de solo abstract es invisible para la síntesis salvo que una sub-consulta caiga
+justo sobre su tema, así que el Redactor no puede asumir que «el Experto no lo menciona»
+equivale a «el corpus no lo dice». Las palancas posibles (subir `top_k`, una consulta por
+paper no cubierto) quedan para decidir en N8/N9. No se aplicó ninguna.
+
+### A16 · El LLM devolvió 13 sub-consultas pidiéndole 8–12; el schema lo rechazó
+
+**Descubierto en:** N7 (C2, `llm_calls` id 76). DeepSeek ignoró el máximo del prompt. El
+validador de `SubQueries` lo rechazó (`LLMOutputError`, sin reintento automático), la CLI
+siguió con los demás clústeres y señaló C2. Un reintento manual con `--expert-id C2`
+(id 82) devolvió 12. Es el diseño de X3 funcionando: no se trunca ni se repara.
+**Coste total de N7** (`context.task = "synthesis.subqueries"`, ids 72–82): 11 llamadas
+(9 válidas de producción, 1 del test slow, 1 rechazada) = **27 567 tokens** (11 052 de
+entrada + 16 515 de salida), 89 s. La salida varía mucho para listas de tamaño parecido,
+de 711 (C1) a 3 459 tokens (C8). La causa no se ha verificado. Dato para D2.
+
+### A17 · Obra primaria infiltrada: *El capital* de Marx, traducido por Echeverría
+
+**Descubierto en:** N7 (verificación de A15, 2026-10-03, sin LLM: `papers` + `get_chunk`).
+`doi:10.29166/economia.v70i111.1393` (C1, 130 chunks de PDF) **no es un estudio sobre
+Echeverría: es el texto de Marx.** Es el capítulo I («La mercancía») del Libro I de *El
+capital*. El chunk `#body-1#0` abre con «CAPÍTULO PRIMERO 1. LOS DOS FACTORES DE LA
+MERCANCÍA…», y las secciones indexadas son las de ese capítulo («La forma del valor o el
+valor de cambio», «El carácter fetiche que tiene la mercancía, y su secreto»…). El vínculo
+con el corpus está solo en el abstract, que es una nota del editor: la *Revista Economía*
+(2018, número de aniversario de Marx) republica la **traducción de Echeverría**, publicada
+antes en *Anales* n.º 354 (1976) de la Universidad Central del Ecuador. Ninguno de los 130
+chunks menciona a Echeverría.
+**No lo podía detectar el Excavador:** los metadatos son legítimos y coherentes. El DOI
+resuelve a esa pieza, `authors = ["Karl Marx"]` es correcto, `work_type = "article"`
+describe bien la republicación en revista, y el abstract habla de Echeverría, así que el
+filtro de relevancia acertó al admitirlo.
+**No es candidato a exclusión automática** (a diferencia de E4, que tiene datos
+corruptos): citarlo puede ser correcto, por ejemplo para la traducción de Echeverría o
+para su lectura del valor de uso. Tampoco se excluye por score (L1, A14).
+**Consecuencia para fase 05 (→E5):** el Redactor y el Verificador deben saber que un chunk
+de este paper es **palabra de Marx, no de Echeverría ni de un comentarista**. La pieza dice
+`work_type = "article"`, pero es un capítulo de un libro de otro autor; el traductor no
+figura en `authors`. Atribuirle a Echeverría una tesis sacada de estos chunks sería una
+cita infiel con un `chunk_id` válido, que la validación `supporting_chunks ⊆ recuperados`
+de X3 no detecta. Revisar si hay más obra primaria (traducciones y ediciones de textos
+de Echeverría o de otros) con un censo de `authors` que no contengan a ningún
+comentarista. No se ha hecho.
+
 ---
 
 ## B · Deuda técnica aceptada
@@ -312,14 +414,9 @@ la bibliografía (fase 05).
 - **C7 · `synthesis retrieve` sin `--expert-id` omite los clústeres con archivo ya escrito;
   con `--expert-id` regenera siempre** (N7). Mismo criterio que `skip_existing` de N5: una
   corrida cortada se reanuda gastando solo las llamadas que faltan.
-- **C8 · Primera corrida real (C3, DeepSeek `deepseek-flash`)** (N7): 12 sub-consultas,
-  96 aciertos brutos (12 × top_k 8) → 46 candidatos únicos (21 traídos por más de una
-  consulta), 39 de PDF, 10 de los 12 papers de la partición, score 0.805–0.888 (por debajo
-  de la banda L1: confirma que un umbral habría recortado material sin criterio). Coste:
-  ~1 000 tokens de entrada + 1 000–1 500 de salida por llamada (`llm_calls`, `context.task =
-  "synthesis.subqueries"`); presupuesto de N7 para los 9 clústeres ≈ 9 llamadas ≈ 20 000
-  tokens (dato para D2). Una sub-consulta derivó a un subtema marginal del clúster («ethos
-  corporativo»): no se filtra; N8 decidirá leyendo si aporta.
+- **C8 · Sub-consultas que derivan a un subtema marginal no se filtran** (N7). En C3 una
+  derivó a «ethos corporativo»: N8 decidirá leyendo si aporta. Hallazgos de la corrida
+  real en A14–A16.
 
 ## D · Verificaciones pospuestas
 
@@ -374,6 +471,9 @@ la bibliografía (fase 05).
   invalidaría la inspección de N4 (A8). Su vector sigue entre los 155 que vio k-means
   (un punto de 155; efecto despreciable y confinado a C8). Corpus efectivo de fase 04:
   **154 papers**. La fila de `excavador.db` sigue sin tocar (fase 02 firmada).
+- **E5 (→05):** obra primaria en el corpus (A17). Un chunk puede ser texto del autor
+  estudiado o de quien él traduce, no de un comentarista. La atribución en la prosa debe
+  seguir `authors` del paper, no el tema del corpus.
 
 ## F · Higiene de proceso
 
@@ -408,7 +508,7 @@ la bibliografía (fase 05).
 | N4 | Inspección humana; elegir k | ✅ 2026-09-26 · k=9, seed=42, por inspección (A8) · `clusters` run_id `kmeans-k9-seed42-98b2c308` (155 filas) · 212 tests (+7 slow) · hallazgos A8–A9, B2, E4 |
 | N5 | Etiquetado LLM | ✅ 2026-10-01 · `data/cluster_labels.json` (C0–C8, Gemini) · test slow OK con DeepSeek (9/9, 22 805 tokens) · 264 tests (+8 slow) · hallazgos A10–A13, decisión X6‴ |
 | N6 | Modelos C3/C4/C5 | ✅ 2026-10-01 · `expertos/models.py` (campos 1:1 con C3/C4/C5, verificados también contra el documento de contratos) + `expertos/persistence.py` (escritura atómica) · 323 tests (+8 slow) · comportamientos deliberados C1–C4 (sección C) |
-| N7 | Síntesis 1/2: sub-consultas | ✅ 2026-10-03 · `expertos/synthesis.py` (sub-consultas → retrieval por partición → candidatos) + CLI `synthesis retrieve` · `EXPERTOS_DEEPSEEK_MODEL_SYNTHESIS` · C3 procesado (`data/synthesis/_retrieval/C3.json`) · 343 tests (+9 slow) · test slow OK · comportamientos C5–C8 |
+| N7 | Síntesis 1/2: sub-consultas | ✅ 2026-10-03 · `expertos/synthesis.py` (sub-consultas → retrieval por partición → candidatos) + CLI `synthesis retrieve` · `EXPERTOS_DEEPSEEK_MODEL_SYNTHESIS` · 9/9 clústeres en `data/synthesis/_retrieval/` (27 567 tokens) · 343 tests (+9 slow) · test slow OK · comportamientos C5–C8, hallazgos A14–A17 |
 | N8 | Síntesis 2/2: claims validadas | ⬜ |
 | N9 | Corrida completa de síntesis | ⬜ |
 | N10 | Muestreo de 10 claims | ⬜ |
