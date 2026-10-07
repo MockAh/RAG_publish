@@ -11,7 +11,7 @@ Orquestador/Redactor/Verificador (05).
 
 ## Estado actual
 
-Fase 04, micro-tarea N8 firmada, N9 pendiente. N0–N8 firmadas. 155 papers únicos en
+Fase 04, micro-tarea N9 firmada, N10 pendiente. N0–N9 firmadas. 155 papers únicos en
 data/expert_vectors.npz (3 DOI-variante colapsados, ver A5/A6/E3 del registro). k=9
 elegido por inspección humana (A7/A8); asignación en la tabla `clusters` de
 data/excavador.db, run_id `kmeans-k9-seed42-98b2c308` (sufijo = SHA-256[:8] de
@@ -31,10 +31,14 @@ Echeverría — obra primaria, no estudio; no excluir, pero atribuir a Marx (E5)
 Modelo de síntesis aparte: `EXPERTOS_DEEPSEEK_MODEL_SYNTHESIS` (defecto `deepseek-flash`).
 Claims validadas en `expertos/synthesis.py` (N8): `draft_claims` + CLI `synthesis draft`;
 `PRIMARY_WORKS` en `expertos/assignments.py` (A17); stance por pares de tesis (A19);
-síntesis con `deepseek-v4-pro` (A20). Ninguna síntesis de producción escrita aún:
-`data/synthesis/{expert_id}.json` lo llena N9. Las comparaciones de N8 están en
+síntesis con `deepseek-v4-pro` (A20). Las comparaciones de N8 están en
 `data/synthesis_cmp/` (fuera de git), solo como material de consulta.
-N9 (corrida completa de síntesis) no ha empezado — pedir el prompt antes de escribir código.
+N9: síntesis de producción en `data/synthesis/{expert_id}.json` para C0–C8 (fuera de git;
+auditoría en `_draft/`), 128 claims, criterio 2 ✓ (203/203 `get_chunk`). CLI reanudable
+(`pending_drafts`, `--force`). A21: X3 cazó un `chunk_id` inventado en C3. A22: regeneración
+completa = 0,26 USD, 908 s, máx. salida 61 % del tope (cierra D2). Stance todo `supports` en
+C3, C5, C7 y 0 `mentions` en total: candidatos de N10.
+N10 (muestreo de 10 claims) no ha empezado — pedir el prompt antes de escribir código.
 Repo: `~/WandaVision/RAG_publish`, rama `main` (ver plan para N0–N14).
 
 Paquetes previos, YA FIRMADOS, no modificar sin causa documentada (precedente en el
@@ -104,26 +108,20 @@ Toda llamada, éxito o fallo, se registra en la tabla SQLite `llm_calls`
 (`data/excavador.db`), con `provider` y `context` (JSON: para qué era la llamada).
 Diagnóstico tras un fallo: leer `llm_calls.error`, nunca relanzar (F5).
 
-## Tarea en curso: N8 — Síntesis 2/2: claims validadas
+## Tarea en curso: N9 — Corrida completa de síntesis
 
-Objetivo (fila N8 del plan; X3, X4, X7; A14–A17 del registro). Entrada: los
-`data/synthesis/_retrieval/{expert_id}.json` de N7. N8 no llama al retrieval ni regenera
-sub-consultas.
+Objetivo (fila N9 del plan; criterio de aceptación 2 de la spec). Modelo: `deepseek-v4-pro`
+(A20). Entrada: los `data/synthesis/_retrieval/{expert_id}.json` de N7, ya generados para
+C0–C8; N9 no regenera sub-consultas ni retrieval.
 
-- `draft_claims(expert_id, label, candidates, llm_client)`: una llamada; el prompt lleva cada
-  chunk con `chunk_id`, `paper_id`, autor, año y si es `from_abstract`. Devuelve `summary`
-  (300–800 palabras) y `key_claims` (C3). Reglas del prompt: solo ids de la lista; atribución
-  por autoría, no por tema (A17); `stance` leyendo cada pasaje (X4), sin `supports` por
-  defecto; PDF antes que abstract (X7); pasajes sin sentido gramatical no se usan (E6 de 03).
-- `PRIMARY_WORKS` (`expertos/assignments.py`, mismo patrón que la stoplist E4): 4 papers
-  cuyo texto no es de quien dice `authors`. Su `real_author` sustituye a `authors` en el
-  prompt, junto con su `attribution_note`.
-- Validación en código: `supporting_chunks ⊆ recuperados`. Una claim con un id ajeno se
-  descarta entera, no se repara (X3), y se cuentan las descartadas. Una claim que cita
-  `PRIMARY_WORKS` no se descarta: se marca en el archivo de auditoría para N10.
-- Persistencia con `save_synthesis` (N6). CLI: `python -m expertos synthesis draft [--expert-id Cn]`.
+- Reanudable, como N5: `python -m expertos synthesis draft` (sin `--expert-id`) salta los
+  clústeres que ya tienen `data/synthesis/{expert_id}.json` válido, salvo `--force`. Un archivo
+  que no valida cuenta como pendiente. Si un clúster falla, los anteriores quedan guardados.
+- Un clúster cortado por `max_tokens` no se relanza sin avisar al usuario.
+- Criterio 2: el 100 % de los `supporting_chunks` de los 9 archivos existen en la Biblioteca,
+  verificado con `get_chunk` sobre cada `chunk_id` de cada claim. Un solo fallo es fallo.
 
-Hecho cuando: tests en verde (id ajeno descartado, vacío rechazado, los tres `stance`
-persistidos, autor y año en el prompt, sustitución por `real_author`, round-trip), test `slow`
-con un clúster, y **parar antes de los 9**: C8 con `deepseek-flash` y con `deepseek-v4-pro`,
-claims de ambos al usuario. De esa comparación sale el modelo de N9.
+Hecho cuando: los 9 archivos escritos y, para el usuario: por clúster, nº de claims, reparto
+de stance, descartadas por ⊆ recuperados y marcas de `PRIMARY_WORKS`; conteo de `get_chunk`;
+coste total (tokens, tiempo, saldo DeepSeek antes/después — dato de D2); clústeres con stance
+todo `supports` (candidatos a N10). **No firmar hasta que el usuario lo vea.**

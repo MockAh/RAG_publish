@@ -8,7 +8,7 @@ Uso:
     python -m expertos cluster label [--expert-id C8] [--run-id ...]
     python -m expertos cluster merge --from C8 --into C0
     python -m expertos synthesis retrieve [--expert-id C3] [--run-id ...]
-    python -m expertos synthesis draft [--expert-id C8] [--run-id ...] [--out-dir ...]
+    python -m expertos synthesis draft [--expert-id C8] [--force] [--run-id ...] [--out-dir ...]
 """
 
 from __future__ import annotations
@@ -35,9 +35,9 @@ from expertos.config import Settings
 from expertos.inspection import dump_clusters
 from expertos.labeling import label_all_clusters, label_cluster, load_labels, update_labels
 from expertos.llm import LLMOutputError, make_client
-from expertos.persistence import load_synthesis
 from expertos.synthesis import (
     NoValidClaimsError,
+    pending_drafts,
     retrieval_path,
     run_expert_draft,
     run_expert_retrieval,
@@ -279,11 +279,13 @@ def synthesis_draft(
     out_dir: Path | None = typer.Option(
         None, "--out-dir", help="Dónde guardar síntesis y auditoría (por defecto `synthesis_dir`). El retrieval se lee siempre de `synthesis_dir`."
     ),
+    force: bool = typer.Option(False, "--force", help="Sin `--expert-id`: redactar también los clústeres que ya tienen síntesis válida."),
 ) -> None:
     """Claims validadas (1 llamada LLM por clúster) desde `synthesis_dir/_retrieval/` → síntesis C3 + `_draft/`.
 
-    Sin `--expert-id`, omite los clústeres que ya tienen síntesis en el directorio de salida;
-    con `--expert-id`, la regenera siempre.
+    Sin `--expert-id`, omite los clústeres que ya tienen síntesis válida en el directorio de salida
+    (reanudar tras un fallo gasta solo las llamadas que faltan), salvo `--force`; con `--expert-id`,
+    la regenera siempre.
     """
     _configure_logging()
     settings = Settings()
@@ -299,7 +301,7 @@ def synthesis_draft(
             raise typer.Exit(1)
         todo = [expert_id]
     else:
-        todo = [eid for eid in expected if load_synthesis(eid, synthesis_dir=out_dir) is None]
+        todo = pending_drafts(expected, out_dir=out_dir, force=force)
     missing = [eid for eid in todo if eid not in labels or not retrieval_path(eid, synthesis_dir=settings.synthesis_dir).exists()]
     if missing:
         typer.echo(f"Sin etiqueta o sin retrieval (correr N7): {', '.join(missing)}", err=True)
@@ -330,7 +332,8 @@ def synthesis_draft(
             f"{len(audit.discarded)} descartadas, stance {stances}, "
             f"{len(audit.primary_work_flags)} marcas de obra primaria, summary {len(s.summary.split())} palabras → {out_dir}"
         )
-    typer.echo(f"{len(todo) - len(failed)} síntesis redactadas [{run_id}]")
+    skipped = len(expected) - len(todo) if expert_id is None else 0
+    typer.echo(f"{len(todo) - len(failed)} síntesis redactadas, {skipped} ya existentes [{run_id}]")
     if failed:
         typer.echo(f"Sin síntesis (reintentar con --expert-id): {', '.join(failed)}", err=True)
         raise typer.Exit(1)

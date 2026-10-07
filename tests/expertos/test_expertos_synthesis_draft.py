@@ -12,7 +12,7 @@ from expertos.assignments import PrimaryWork
 from expertos.labeling import ClusterLabel
 from expertos.llm import LLMOutputError
 from expertos.models import Claim
-from expertos.persistence import load_synthesis
+from expertos.persistence import load_synthesis, save_synthesis
 from expertos.synthesis import (
     CandidateChunk,
     NoValidClaimsError,
@@ -20,11 +20,13 @@ from expertos.synthesis import (
     build_draft_prompt,
     draft_claims,
     load_draft_audit,
+    pending_drafts,
     run_expert_draft,
     save_retrieval,
 )
 from tests.expertos.test_expertos_labeling import _paper
 from tests.expertos.test_expertos_synthesis import _chunk
+from tests.expertos.test_expertos_persistence import _synthesis
 
 RUN_ID = "kmeans-k9-seed42-0123abcd"
 MARX = "doi:marx"
@@ -284,6 +286,23 @@ def test_run_expert_draft_without_retrieval_fails_before_calling_the_llm(tmp_pat
     with pytest.raises(FileNotFoundError, match="correr N7"):
         run_expert_draft("C1", llm, run_id=RUN_ID, label=_LABEL, excavador_storage=Storage(_papers()), synthesis_dir=tmp_path)
     assert llm.calls == []
+
+
+def test_pending_drafts_skips_valid_syntheses_and_keeps_order(tmp_path: Path) -> None:
+    save_synthesis(_synthesis("C1"), synthesis_dir=tmp_path)
+    assert pending_drafts(["C0", "C1", "C2"], out_dir=tmp_path) == ["C0", "C2"]
+
+
+def test_pending_drafts_with_force_returns_all(tmp_path: Path) -> None:
+    save_synthesis(_synthesis("C1"), synthesis_dir=tmp_path)
+    assert pending_drafts(["C0", "C1"], out_dir=tmp_path, force=True) == ["C0", "C1"]
+
+
+def test_pending_drafts_counts_invalid_or_foreign_file_as_pending(tmp_path: Path) -> None:
+    (tmp_path / "C0.json").write_text("{\"expert_id\": \"C0\"}", encoding="utf-8")
+    save_synthesis(_synthesis("C2"), synthesis_dir=tmp_path)
+    (tmp_path / "C2.json").rename(tmp_path / "C1.json")
+    assert pending_drafts(["C0", "C1"], out_dir=tmp_path) == ["C0", "C1"]
 
 
 # --- corrida real -----------------------------------------------------------------

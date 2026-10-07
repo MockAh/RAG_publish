@@ -474,6 +474,27 @@ estos juicios pueden variar entre corridas. La decisión se apoya en que las tre
 apuntan en la misma dirección, no en ninguna cifra aislada. No se compararon precios por
 token.
 
+### A21 · La validación ⊆ recuperados interceptó una alucinación realista
+
+**Descubierto en:** N9 (C3, `llm_calls` id 94). Un claim citó
+`doi:10.17141/iconos.43.2012.349#¿Retorno al barroco?#38`: paper real de la partición, seq
+real, nombre de sección inventado (los candidatos de ese paper son, p. ej.,
+`…#Barroco y Mestizaje#38`). El chunk no existe (`get_chunk` → `None`). Ningún prompt lo
+habría evitado y ninguna revisión por similitud lo habría detectado: el id es plausible. Lo
+cazó la comprobación en código de X3, que descartó el claim entero sin repararlo.
+**Consecuencia:** confirma el diseño de X3: la garantía de «prohibido afirmar sin `chunk_id`»
+la da el código, no el prompt. Tasa medida: 1 de 129 claims generados (0,8 %).
+
+### A22 · Coste real de una regeneración completa (cierra D2)
+
+**Descubierto en:** N9 (`llm_calls` ids 90–98, `deepseek-v4-pro`, `max_tokens=32768`).
+9 llamadas, 141 939 tokens de entrada y 127 016 de salida, 908 s de latencia sumada,
+0,26 USD (saldo 4,13 → 3,90 USD por los 8 clústeres de la corrida; C6, lanzado antes,
+estimado en ~0,03 USD por proporción de tokens). Sin reintentos. Margen de salida: el máximo
+fue C4 con 19 945 tokens, el 61 % del tope de 32 768. La salida no escala con el número de
+candidatos (C6, 76 candidatos: 10 899; C3, 46: 17 363).
+**Consecuencia:** para la spec 05, el presupuesto por consulta se calcula sobre estos números.
+
 ---
 
 ## B · Deuda técnica aceptada
@@ -526,7 +547,7 @@ la bibliografía (fase 05).
 
 - **D1 (→N4) ✅ resuelta en N4 (A8: k=9).** Elección de k. El silhouette será bajo por el carácter monotemático del
   corpus; manda la inspección humana de 3 clústeres, no la métrica.
-- **D2 (→N9):** coste real de una regeneración completa. Se lee de `llm_calls`, no se estima.
+- **D2 (→N9) ✅ resuelta en N9 (A22: 0,26 USD, 268 955 tokens, 908 s).** Coste real de una regeneración completa. Se lee de `llm_calls`, no se estima.
 - **D3 (→N10):** tasa de claims realmente sustentadas, con los fallos clasificados en
   *claim infiel* frente a *chunk roto* (E6 de fase 03).
 
@@ -614,7 +635,7 @@ la bibliografía (fase 05).
 | N6 | Modelos C3/C4/C5 | ✅ 2026-10-01 · `expertos/models.py` (campos 1:1 con C3/C4/C5, verificados también contra el documento de contratos) + `expertos/persistence.py` (escritura atómica) · 323 tests (+8 slow) · comportamientos deliberados C1–C4 (sección C) |
 | N7 | Síntesis 1/2: sub-consultas | ✅ 2026-10-03 · `expertos/synthesis.py` (sub-consultas → retrieval por partición → candidatos) + CLI `synthesis retrieve` · `EXPERTOS_DEEPSEEK_MODEL_SYNTHESIS` · 9/9 clústeres en `data/synthesis/_retrieval/` (27 567 tokens) · 343 tests (+9 slow) · test slow OK · comportamientos C5–C8, hallazgos A14–A17 |
 | N8 | Síntesis 2/2: claims validadas | ✅ 2026-10-03 · `draft_claims` + CLI `synthesis draft` · `PRIMARY_WORKS` (4 papers) · stance por pares de tesis, validado en C3 (#27, #29, #38 → contradicts) · síntesis con `deepseek-v4-pro`, `max_tokens=32768` · 359 tests (+10 slow) · test slow OK · hallazgos A17 (censo), A18–A20 |
-| N9 | Corrida completa de síntesis | ⬜ |
+| N9 | Corrida completa de síntesis | ✅ 2026-10-07 · 9/9 síntesis en `data/synthesis/` (128 claims: 121 supports, 7 contradicts, 0 mentions; 1 descartada; 12 marcas de `PRIMARY_WORKS`) · criterio 2: 203/203 `get_chunk` ✓ · CLI reanudable con `--force` (`pending_drafts`) · 362 tests (+10 slow) · stance todo `supports` en C3, C5, C7 (→N10) · hallazgos A21–A22, cierra D2 |
 | N10 | Muestreo de 10 claims | ⬜ |
 | N11 | SynthesisMap | ⬜ |
 | N12 | Modo consulta | ⬜ |

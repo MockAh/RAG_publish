@@ -42,7 +42,7 @@ from expertos.inspection import PaperLookup
 from expertos.labeling import ClusterLabel, _clean, select_representatives
 from expertos.llm import LLMClient
 from expertos.models import Claim, Synthesis, check_summary
-from expertos.persistence import _atomic_write_text, _synthesis_path, save_synthesis
+from expertos.persistence import _atomic_write_text, _synthesis_path, load_synthesis, save_synthesis
 
 logger = logging.getLogger(__name__)
 
@@ -567,6 +567,30 @@ def load_draft_audit(expert_id: str, *, synthesis_dir: Path) -> DraftAudit | Non
     if not path.exists():
         return None
     return DraftAudit.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def pending_drafts(expert_ids: Sequence[str], *, out_dir: Path, force: bool = False) -> list[str]:
+    """Los `expert_ids` sin síntesis válida en `out_dir` (todos con `force`), en el mismo orden.
+
+    Reanudar (N9) gasta solo las llamadas que faltan. Un archivo que no valida contra C3 —o que
+    contiene la síntesis de otro Experto— cuenta como pendiente: se avisa y se reescribe.
+    """
+    if force:
+        return list(expert_ids)
+    pending = []
+    for eid in expert_ids:
+        try:
+            s = load_synthesis(eid, synthesis_dir=out_dir)
+        except ValidationError as exc:
+            logger.warning("%s: síntesis inválida en %s, se redacta de nuevo: %s", eid, out_dir, exc)
+            s = None
+        else:
+            if s is not None and s.expert_id != eid:
+                logger.warning("%s: el archivo contiene la síntesis de %s, se redacta de nuevo", eid, s.expert_id)
+                s = None
+        if s is None:
+            pending.append(eid)
+    return pending
 
 
 def run_expert_draft(
