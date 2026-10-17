@@ -9,6 +9,8 @@ Uso:
     python -m expertos cluster merge --from C8 --into C0
     python -m expertos synthesis retrieve [--expert-id C3] [--run-id ...]
     python -m expertos synthesis draft [--expert-id C8] [--force] [--run-id ...] [--out-dir ...]
+    python -m expertos sample --n 10 [--seed 42] [--contradicts 3] [--mention-ids C6#11,C5#11,C2#11] [--out ...] [--force]
+    python -m expertos sample --report [--out ...]
 """
 
 from __future__ import annotations
@@ -35,8 +37,22 @@ from expertos.config import Settings
 from expertos.inspection import dump_clusters
 from expertos.labeling import label_all_clusters, label_cluster, load_labels, update_labels
 from expertos.llm import LLMOutputError, make_client
+from expertos.persistence import load_all_syntheses
+from expertos.sampling import (
+    DEFAULT_CONTRADICTS_QUOTA,
+    dump_for_review,
+    load_verdicts,
+    mention_candidates,
+    DEFAULT_MENTION_QUOTA,
+    population_by_stance,
+    population_by_stratum,
+    sample_claims,
+    source_concentration,
+    summarize,
+)
 from expertos.synthesis import (
     NoValidClaimsError,
+    load_retrieval,
     pending_drafts,
     retrieval_path,
     run_expert_draft,
@@ -337,6 +353,106 @@ def synthesis_draft(
     if failed:
         typer.echo(f"Sin síntesis (reintentar con --expert-id): {', '.join(failed)}", err=True)
         raise typer.Exit(1)
+
+
+def _pct(rate: float | None) -> str:
+    return "—" if rate is None else f"{rate:.0%}"
+
+
+@app.command("sample")
+def sample(
+    n: int = typer.Option(10, "--n", help="Claims de la muestra (criterio 3: 10)."),
+    seed: int = typer.Option(42, "--seed"),
+    contradicts: int = typer.Option(
+        DEFAULT_CONTRADICTS_QUOTA, "--contradicts", help="Cupo de claims `contradicts` (estrato raro, A19)."
+    ),
+    mention_ids: str = typer.Option(
+        "C6#11,C5#11,C2#11",
+        "--mention-ids",
+        help="Estrato `mencion`: candidatas fuertes elegidas leyendo el anexo A (N10). Vacío = `--mentions` al azar.",
+    ),
+    mentions_quota: int = typer.Option(DEFAULT_MENTION_QUOTA, "--mentions", help="Cupo del estrato `mencion` si no hay ids."),
+    out: Path | None = typer.Option(None, "--out", help="Por defecto, `review_path` de Settings."),
+    report: bool = typer.Option(False, "--report", help="Leer los veredictos anotados y resumir, en vez de muestrear."),
+    force: bool = typer.Option(False, "--force", help="Reescribir el .md aunque ya tenga veredictos anotados."),
+) -> None:
+    """Muestreo manual de claims (N10, criterio 3), sin LLM: escribe el .md de revisión o resume sus veredictos."""
+    _configure_logging()
+    settings = Settings()
+    out = out or settings.review_path
+    syntheses = load_all_syntheses(synthesis_dir=settings.synthesis_dir)
+    if not syntheses:
+        typer.echo(f"No hay síntesis en {settings.synthesis_dir} (correr N9)", err=True)
+        raise typer.Exit(1)
+    population = population_by_stratum(syntheses)
+
+    if report:
+        if not out.exists():
+            typer.echo(f"No existe {out} (correr `sample --n 10` primero)", err=True)
+            raise typer.Exit(1)
+        summary = summarize(load_verdicts(out), population)
+        typer.echo(f"{summary.n} claims, {summary.n_pending} pendientes · {out}")
+        typer.echo("Veredictos: " + ", ".join(f"{v} = {c}" for v, c in summary.counts.items()))
+        for stratum, counts in summary.counts_by_stratum.items():
+            typer.echo(f"    {stratum} (población {population.get(stratum, 0)}): " + ", ".join(f"{v} = {c}" for v, c in counts.items() if c))
+        typer.echo(f"Juzgables (sin chunk_roto): {summary.n_judgeable}")
+        typer.echo(
+            f"Criterio 3 · sustentadas (ok / juzgables): {_pct(summary.weighted_support_rate)} ponderada "
+            f"(cruda {_pct(summary.support_rate)})"
+        )
+        typer.echo(
+            f"Acierto de stance (ok / ok + stance_erroneo): {_pct(summary.weighted_stance_rate)} ponderada "
+            f"(cruda {_pct(summary.stance_rate)})"
+        )
+        verdict = {None: "pendiente", True: "✓ cumple", False: "✗ no cumple"}[summary.meets_criterion_3]
+        typer.echo(f"Criterio 3 (≥ 90 %, ponderada, A23): {verdict}")
+        return
+
+    if out.exists() and not force and any(v.verdict for v in load_verdicts(out)):
+        typer.echo(f"{out} ya tiene veredictos anotados; usa --force para reescribirlo o --out para otro archivo", err=True)
+        raise typer.Exit(1)
+    retrievals = {eid: load_retrieval(eid, synthesis_dir=settings.synthesis_dir) for eid in syntheses}
+    missing = [eid for eid, record in retrievals.items() if record is None]
+    if missing:
+        typer.echo(f"Sin retrieval (correr N7): {', '.join(missing)}", err=True)
+        raise typer.Exit(1)
+    storage = Storage(settings.db_path)
+    sampled = sample_claims(
+        n, seed, syntheses=syntheses, retrievals=retrievals, excavador_storage=storage,
+        contradicts_quota=contradicts,
+        mention_quota=mentions_quota,
+        mention_ids=[cid.strip() for cid in mention_ids.split(",") if cid.strip()] or None,
+    )
+    mentions = mention_candidates(syntheses)
+    concentration = source_concentration(syntheses, retrievals, storage)
+    dump_for_review(
+        sampled,
+        out,
+        seed=seed,
+        population=population,
+        mentions=mentions,
+        concentration=concentration,
+    )
+
+    typer.echo("Stance: " + ", ".join(f"{st} = {c}" for st, c in population_by_stance(syntheses).items()))
+    typer.echo("Estratos (población): " + ", ".join(f"{st} = {c}" for st, c in population.items()))
+    for s in sampled:
+        flags = [f"{len(s.chunks)} chunk(s)"]
+        if any(c.from_abstract for c in s.chunks):
+            flags.append("abstract")
+        if any(c.primary_work for c in s.chunks):
+            flags.append("PRIMARY_WORKS")
+        if s.twins:
+            flags.append("gemela " + ", ".join(f"#{t.index}" for t in s.twins))
+        typer.echo(f"  {s.claim_id:<6} {s.stratum:<12} {s.claim.stance:<12} [{'; '.join(flags)}] {s.claim.text[:90]}")
+    strong = [m for m in mentions if m.strength == "fuerte"]
+    typer.echo(f"Marcadores de mención en claims supports: {len(strong)} fuertes, {len(mentions) - len(strong)} débiles")
+    for m in strong:
+        typer.echo(f"    {m.claim_id}: {', '.join(m.markers)} · {m.text[:90]}")
+    typer.echo("Concentración (claims que citan el paper más citado):")
+    for c in sorted(concentration, key=lambda c: -c.share):
+        typer.echo(f"    {c.expert_id}: {c.n_top}/{c.n_claims} = {c.share:.0%} · {c.top_title[:70]} ({c.top_paper_id})")
+    typer.echo(f"{len(sampled)} claims → {out}")
 
 
 if __name__ == "__main__":

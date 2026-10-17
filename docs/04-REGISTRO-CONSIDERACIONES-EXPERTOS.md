@@ -449,6 +449,10 @@ consideradas por Echeverría») sigue llevando el disenso en la frase, con `supp
 `mentions` sigue en 0. Se revisará en N10.
 **Coste de la corrección:** 20 972 tokens de salida y 191 s, frente a 14 820 y 131 s con el
 prompt anterior. Cabe en `max_tokens=32768` (A18), pero el margen se ha reducido.
+**Matiz (N10, A24):** la corrección explica el cero en `contradicts`, pero no el cero en
+`mentions`. Las tres candidatas más fuertes a `mentions` resultaron `supports` correctos
+según la lectura humana. Así que lo más probable es que ese cero no venga del prompt, sino de
+la fuente: el retrieval apenas trae menciones de pasada. Ver A24.
 
 ### A20 · Comparación de modelos para síntesis: `deepseek-v4-pro`
 
@@ -494,6 +498,56 @@ estimado en ~0,03 USD por proporción de tokens). Sin reintentos. Margen de sali
 fue C4 con 19 945 tokens, el 61 % del tope de 32 768. La salida no escala con el número de
 candidatos (C6, 76 candidatos: 10 899; C3, 46: 17 363).
 **Consecuencia:** para la spec 05, el presupuesto por consulta se calcula sobre estos números.
+
+### A23 · El criterio 3 se juzga por la tasa ponderada: la muestra está inclinada a propósito
+
+**Descubierto en:** N10 (diseño de la muestra, 2026-10-11). La spec pide «10 claims al azar;
+≥ 9 sustentadas». Un azar uniforme sobre las 128 claims de N9 deja fuera los 7 `contradicts`
+con probabilidad ≈ 57 % ((121/128)^10), y no garantiza ver ninguna de las candidatas a
+`mentions` mal clasificadas (N9: 0 `mentions` en 128, poco verosímil). Son justo los dos casos
+frágiles de A19. Por eso la muestra (`expertos/sampling.py`) es **estratificada**, con tres
+estratos disjuntos:
+
+| estrato | población | en la muestra | cómo entra |
+|---|---|---|---|
+| `contradicts` | 7 | 3 | al azar (semilla 42) |
+| `mencion`: `supports` con marcador léxico fuerte de mención («reseña», «cita a», «autores como»…) | 5 | 3 | elegidas a mano leyendo las candidatas: C2#11, C5#11, C6#11 |
+| `corriente`: el resto | 116 | 4 | al azar |
+
+La heurística léxica no mira el paréntesis final de autores: «(pasaje de X, que cita a
+Echeverría)» describe el pasaje, no la claim (era el falso positivo de C4#4).
+**Consecuencia:** la tasa cruda de la muestra está sesgada hacia los estratos raros: 6 de 10
+claims salen de 12 de 128. Juzgar el criterio por ella penalizaría el corpus por haber mirado
+adrede donde más falla. **El criterio 3 se juzga por la tasa ponderada**: la tasa de cada
+estrato, pesada por su población (116/5/7 sobre 128). La cruda se informa al lado.
+Con 3–4 claims por estrato, cada tasa por estrato es gruesa; la ponderada está dominada por las
+4 de `corriente`. Es una estimación de muestra pequeña, como pide la spec, no una medida fina.
+**Dos tasas, no una.** `stance_erroneo` (el pasaje sustenta el texto pero la postura está mal)
+**no cuenta como sustentada**: la claim C3 es texto + postura, y el Redactor leerá la postura.
+Se informa aparte el acierto de stance = `ok` / (`ok` + `stance_erroneo`), también ponderado.
+`chunk_roto` (E6) sale de ambos denominadores: no cuenta contra el Experto.
+
+### A24 · El cero en `mentions` es estructural: el retrieval devuelve pasajes sustantivos
+
+**Descubierto en:** N10 (lectura humana de la muestra, 2026-10-17). En el estrato `mencion`
+se eligieron las tres candidatas más claras a `mentions` mal clasificadas, según el marcador
+léxico: C2#11 («autores como»), C5#11 («reseña») y C6#11 («cita a»). **Las tres son `supports`
+correctos.** En cada una, el pasaje expone la tesis por extenso y no la nombra de pasada:
+- Piñeiro Aguiar y Breilh desarrollan la relación entre Echeverría y el Buen Vivir.
+- Ortega Esquivel describe la edición de Itaca.
+- Torres Gaxiola cita a Echeverría para apoyar su propio argumento.
+
+El marcador léxico venía de la regla de atribución de A17, no de una mención real.
+**Lectura:** el cero en `mentions` (N9: 0 de 128) no parece un defecto del juicio de stance,
+sino de dónde sale el material. El Experto solo ve los pasajes que recuperan las sub-consultas
+temáticas de N7. Esas sub-consultas premian el pasaje denso sobre el tema, y una mención de
+pasada (una línea que nombra la tesis y sigue con otra cosa) rara vez queda entre los
+candidatos. No se puede clasificar como `mentions` lo que nunca llega al modelo.
+**Alcance:** es una muestra de 3, elegida a mano, y no prueba que no existan menciones mal
+clasificadas entre las 116 `corriente`. Tampoco se ha medido cuántas menciones de pasada hay en
+el corpus fuera de lo recuperado. Para fase 05: no esperar `mentions` de los Expertos. Si el
+Redactor necesita distinguir «trata» de «nombra», tendrá que salir de otra vía de
+recuperación, no de reajustar el prompt.
 
 ---
 
@@ -599,6 +653,20 @@ la bibliografía (fase 05).
 - **E5 (→05):** obra primaria en el corpus (A17). Un chunk puede ser texto del autor
   estudiado o de quien él traduce, no de un comentarista. La atribución en la prosa debe
   seguir `authors` del paper, no el tema del corpus.
+- **E6 (→05):** el miembro `contradicts` de un par A19 lleva una atribución que su propio
+  chunk no sustenta. Las dos claims del par comparten el texto de la tesis, atribuida a quien
+  la sostiene, pero el miembro `contradicts` cita el pasaje que la *discute*, no el que la
+  atribuye. Caso: C6#13, «Guillén sostiene, citado por Campos Madrigal, que…». La atribución a
+  Guillén está en `doi:10.46652/rgn.v6i29.837#Introducción#2`, que es el chunk de la gemela
+  C6#12 (`supports`). C6#13 cita `#…valor de uso#17`, donde Guillén no aparece y que matiza la
+  tesis. En N10 se juzgó `ok`, porque es lo que pide A19. Pero un Verificador de fase 05 que
+  compruebe frase contra chunk lo marcaría `not_entailed` **por diseño, no por cita falsa**.
+  Afecta a los 7 `contradicts` de N9. Hay dos salidas, a decidir en fase 05:
+  (a) el Redactor no arrastra la atribución cuando cita el miembro `contradicts`: escribe
+  «Y matiza la tesis de que…» y cita la atribución con el chunk del miembro `supports`;
+  (b) el Verificador trata el par como unidad: la atribución se comprueba contra los chunks de
+  ambos miembros, y la discusión, solo contra los del `contradicts`.
+  Detectado en el muestreo de N10.
 
 ## F · Higiene de proceso
 
@@ -636,7 +704,7 @@ la bibliografía (fase 05).
 | N7 | Síntesis 1/2: sub-consultas | ✅ 2026-10-03 · `expertos/synthesis.py` (sub-consultas → retrieval por partición → candidatos) + CLI `synthesis retrieve` · `EXPERTOS_DEEPSEEK_MODEL_SYNTHESIS` · 9/9 clústeres en `data/synthesis/_retrieval/` (27 567 tokens) · 343 tests (+9 slow) · test slow OK · comportamientos C5–C8, hallazgos A14–A17 |
 | N8 | Síntesis 2/2: claims validadas | ✅ 2026-10-03 · `draft_claims` + CLI `synthesis draft` · `PRIMARY_WORKS` (4 papers) · stance por pares de tesis, validado en C3 (#27, #29, #38 → contradicts) · síntesis con `deepseek-v4-pro`, `max_tokens=32768` · 359 tests (+10 slow) · test slow OK · hallazgos A17 (censo), A18–A20 |
 | N9 | Corrida completa de síntesis | ✅ 2026-10-07 · 9/9 síntesis en `data/synthesis/` (128 claims: 121 supports, 7 contradicts, 0 mentions; 1 descartada; 12 marcas de `PRIMARY_WORKS`) · criterio 2: 203/203 `get_chunk` ✓ · CLI reanudable con `--force` (`pending_drafts`) · 362 tests (+10 slow) · stance todo `supports` en C3, C5, C7 (→N10) · hallazgos A21–A22, cierra D2 |
-| N10 | Muestreo de 10 claims | ⬜ |
+| N10 | Muestreo de 10 claims | ✅ 2026-10-17 · `expertos/sampling.py` + CLI `sample` · muestra estratificada (3 `contradicts`, 3 `mencion`, 4 `corriente`; A23) en `data/synthesis/_review/N10-muestra.md` · 10/10 `ok`: criterio 3 = 100 % ponderada (cruda 100 %) ✓, acierto de stance 100 % · 378 tests (+10 slow) · hallazgos A23–A24 (matiza A19), E6 |
 | N11 | SynthesisMap | ⬜ |
 | N12 | Modo consulta | ⬜ |
 | N13 | Preguntas trampa | ⬜ |
