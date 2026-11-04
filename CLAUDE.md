@@ -11,7 +11,7 @@ Orquestador/Redactor/Verificador (05).
 
 ## Estado actual
 
-Fase 04, micro-tarea N11 firmada, N12 pendiente. N0–N11 firmadas. 155 papers únicos en
+Fase 04, micro-tarea N12 firmada, N13 pendiente. N0–N12 firmadas. 155 papers únicos en
 data/expert_vectors.npz (3 DOI-variante colapsados, ver A5/A6/E3 del registro). k=9
 elegido por inspección humana (A7/A8); asignación en la tabla `clusters` de
 data/excavador.db, run_id `kmeans-k9-seed42-98b2c308` (sufijo = SHA-256[:8] de
@@ -45,7 +45,11 @@ de un par A19 no sustenta en su chunk la atribución de la tesis.
 N11: `data/synthesis_map.json` (fuera de git) con 9 entradas y 154 papers, generado por
 `expertos/synthesis_map.py` y `python -m expertos map build`, sin LLM. Criterio 5 ✓: ~1 453 tokens
 reales de 4 000 (A25, medido solo con DeepSeek). E7 (→05): C4 no expone `coherent=false` de C1 y C8.
-N12 (modo consulta) no ha empezado — el usuario lo arranca con «arranca N12».
+N12: `expertos/consult.py` + CLI `ask`; una llamada por pregunta, pregunta tal cual como única
+consulta (`top_k=16`), sin sub-consultas por decisión del usuario: se agregan solo si N13 muestra que
+faltan pasajes que sí están en el corpus. Auditoría en `data/consult/`. A26: la prosa de `answer` y la
+fidelidad de cada claim no las valida el código (→05). Cita textual por verificar con código: se decide
+con los resultados de N13.
 Repo: `~/WandaVision/RAG_publish`, rama `main` (ver plan para N0–N14).
 
 Paquetes previos, YA FIRMADOS, no modificar sin causa documentada (precedente en el
@@ -115,17 +119,19 @@ Toda llamada, éxito o fallo, se registra en la tabla SQLite `llm_calls`
 (`data/excavador.db`), con `provider` y `context` (JSON: para qué era la llamada).
 Diagnóstico tras un fallo: leer `llm_calls.error`, nunca relanzar (F5).
 
-## Tarea en curso: N11 — `SynthesisMap` (C4) con conteo de tokens
+## Tarea en curso: N12 — Modo consulta (`ExpertAnswer`, C5)
 
-Objetivo (fila N11 del plan; criterio 5: el mapa completo ≤ 4 000 tokens). Sin LLM en la
-construcción: `data/synthesis_map.json` se arma con lo que ya existe.
+Objetivo (fila N12 del plan): un Experto responde una pregunta online con prosa breve citada,
+`confidence` juzgada por el LLM y `gaps`. Hecho cuando: test con store dummy en verde.
 
-- `expertos/synthesis_map.py`: `build_synthesis_map` toma `topic_label` y `paper_ids` de
-  `data/synthesis/{expert_id}.json` (C3), `one_liner` y `keywords` de `data/cluster_labels.json`
-  (A13), y coteja con `load_corpus_assignment`. Cualquier incoherencia entre las tres fuentes
-  es error, no se repara.
-- `count_map_tokens`: estimación offline; pasarse del tope impide escribir el mapa.
-- CLI: `python -m expertos map build [--run-id ...]`.
+- `expertos/consult.py`: `answer_question` recupera por la pregunta dentro de la partición del
+  Experto (`retrieve_for_expert`), una sola llamada LLM, y valida con `validate_claims` (X3).
+- El prompt no muestra scores (L1) y avisa de que recuperar no es responder (L2). `confidence`
+  no se deriva de ningún número.
+- Sin evidencia válida no hay prosa sin citar: respuesta fija, `confidence="low"` y `gaps`
+  obligatorio. Si se descarta alguna claim, la prosa se rehace con las claims supervivientes.
+- Cada consulta se guarda entera en `data/consult/` (`save_consult`): respuesta, salida cruda del
+  LLM, pasajes leídos y descartes. `llm_calls` no conserva ese texto.
+- CLI: `python -m expertos ask --expert-id C6 "pregunta"`. Modelo: el de síntesis (A20).
 
-Hecho cuando: el mapa está en disco con sus 9 entradas y el criterio 5 medido, con el conteo
-contrastado contra un proveedor real. **No firmar hasta que el usuario lo vea.**
+**No firmar hasta que el usuario lo vea.**

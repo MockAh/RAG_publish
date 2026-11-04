@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     chroma_dir: Path = Path("data/chroma")
     synthesis_dir: Path = Path("data/synthesis")
     synthesis_map_path: Path = Path("data/synthesis_map.json")
+    consult_dir: Path = Path("data/consult")  # auditoría del modo consulta (N12)
     review_path: Path = Path("data/synthesis/_review/N10-muestra.md")  # muestreo manual (N10)
     expert_vectors_path: Path = Path("data/expert_vectors.npz")
     cluster_report_path: Path = Path("data/cluster_sweep_report.md")

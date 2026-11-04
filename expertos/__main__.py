@@ -12,6 +12,7 @@ Uso:
     python -m expertos sample --n 10 [--seed 42] [--contradicts 3] [--mention-ids C6#11,C5#11,C2#11] [--out ...] [--force]
     python -m expertos sample --report [--out ...]
     python -m expertos map build [--run-id ...]
+    python -m expertos ask --expert-id C6 "pregunta" [--top-k 16] [--run-id ...]
 """
 
 from __future__ import annotations
@@ -35,6 +36,7 @@ from expertos.assignments import (
 )
 from expertos.clustering import load_matrix, report, run_hdbscan, sweep_kmeans
 from expertos.config import Settings
+from expertos.consult import DEFAULT_TOP_K, answer_question, save_consult
 from expertos.inspection import dump_clusters
 from expertos.labeling import label_all_clusters, label_cluster, load_labels, update_labels
 from expertos.llm import LLMOutputError, make_client
@@ -484,6 +486,44 @@ def map_build(
     n_papers = sum(entry.n_papers for entry in synthesis_map.entries)
     typer.echo(f"{len(synthesis_map.entries)} Expertos, {n_papers} papers → {path}")
     typer.echo(f"Criterio 5: ~{count_map_tokens(synthesis_map)} tokens estimados (tope {MAP_TOKEN_LIMIT})")
+
+
+@app.command("ask")
+def ask(
+    question: str = typer.Argument(..., help="Pregunta para el Experto."),
+    expert_id: str = typer.Option(..., "--expert-id", help="Experto a consultar (p. ej. C6)."),
+    top_k: int = typer.Option(DEFAULT_TOP_K, "--top-k", help="Pasajes a recuperar de la partición."),
+    run_id: str | None = typer.Option(None, "--run-id", help="Por defecto, `cluster_run_id` de Settings."),
+) -> None:
+    """Modo consulta: una llamada al LLM; guarda la consulta en `consult_dir` e imprime el `ExpertAnswer` (C5) en JSON."""
+    _configure_logging()
+    settings = Settings()
+    run_id = run_id or settings.cluster_run_id
+    _check_run_id_matches_vectors(run_id, settings)
+    label = load_labels(settings.cluster_labels_path, run_id).get(expert_id)
+    if label is None:
+        typer.echo(f"{expert_id} sin etiqueta en {settings.cluster_labels_path} [{run_id}]", err=True)
+        raise typer.Exit(1)
+    try:
+        result = answer_question(
+            expert_id,
+            question,
+            label,
+            make_client("synthesis", settings),
+            ChunkStore(settings.chroma_dir),
+            run_id=run_id,
+            db_path=settings.db_path,
+            excavador_storage=Storage(settings.db_path),
+            top_k=top_k,
+        )
+    except (LLMOutputError, ValueError) as exc:
+        typer.echo(f"Sin respuesta de {expert_id}: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    path = save_consult(result, consult_dir=settings.consult_dir)
+    typer.echo(result.answer.model_dump_json(indent=2))
+    typer.echo(f"{len(result.candidates)} pasajes leídos, {len(result.discarded)} claims descartadas → {path}", err=True)
+    for item in result.discarded:
+        typer.echo(f"  descartada ({item.reason}): {item.claim.text}", err=True)
 
 if __name__ == "__main__":
     app()

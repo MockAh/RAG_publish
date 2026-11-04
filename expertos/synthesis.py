@@ -370,6 +370,31 @@ class NoValidClaimsError(ValueError):
     """Ninguna claim del borrador sobrevivió a la validación: no hay síntesis que guardar."""
 
 
+def format_passages(
+    candidates: Sequence[ScoredChunk],
+    excavador_storage: PaperLookup,
+    primary_works: Mapping[str, PrimaryWork] = PRIMARY_WORKS,
+) -> list[str]:
+    """Líneas de prompt de cada pasaje: `chunk_id`, `paper_id`, autor, año y fuente; nunca el score (L1).
+
+    Para la obra primaria, el `real_author` sustituye a `authors` y va con su `attribution_note`.
+    """
+    lines: list[str] = []
+    for sc in candidates:
+        paper_id = sc.chunk.paper_id
+        paper = excavador_storage.get_paper(paper_id)
+        if paper is None:
+            raise ValueError(f"{paper_id} no está en excavador.db")
+        primary = primary_works.get(paper_id)
+        author = primary.real_author if primary else ("; ".join(paper.authors) or "desconocido")
+        source = "abstract" if sc.from_abstract else "PDF"
+        lines += ["", f"[{sc.chunk.chunk_id}]", f"paper_id: {paper_id} · autor: {author} · año: {paper.year} · fuente: {source}"]
+        if primary:
+            lines.append(f"nota de atribución: {primary.attribution_note}")
+        lines.append(_clean(sc.chunk.text))
+    return lines
+
+
 def build_draft_prompt(
     label: ClusterLabel,
     candidates: Sequence[ScoredChunk],
@@ -429,18 +454,7 @@ objetos con "text", "supporting_chunks" y "stance")."""
         "",
         f"Pasajes ({len(candidates)}):",
     ]
-    for sc in candidates:
-        paper_id = sc.chunk.paper_id
-        paper = excavador_storage.get_paper(paper_id)
-        if paper is None:
-            raise ValueError(f"{paper_id} no está en excavador.db")
-        primary = primary_works.get(paper_id)
-        author = primary.real_author if primary else ("; ".join(paper.authors) or "desconocido")
-        source = "abstract" if sc.from_abstract else "PDF"
-        lines += ["", f"[{sc.chunk.chunk_id}]", f"paper_id: {paper_id} · autor: {author} · año: {paper.year} · fuente: {source}"]
-        if primary:
-            lines.append(f"nota de atribución: {primary.attribution_note}")
-        lines.append(_clean(sc.chunk.text))
+    lines += format_passages(candidates, excavador_storage, primary_works)
     return system, "\n".join(lines)
 
 

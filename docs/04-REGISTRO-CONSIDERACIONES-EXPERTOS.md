@@ -562,6 +562,23 @@ concreto. Se cuenta el archivo tal como se guarda (`indent=2`).
 
 ---
 
+### A26 · Primera prueba real del modo consulta: reconoce lo que no sabe, pero la prosa no está verificada
+
+**Descubierto en:** N12, con 2 preguntas a C6 en `deepseek-v4-pro` (`llm_calls` 101 y 102). No es
+una medición: eso es N13.
+Fuera de tema (pan de muerto): `evidence` vacía, `low`, `gaps` explícito; 6 s y 257 tokens de salida.
+Dentro de tema (valor de uso y forma natural): 7 claims, `high`, `gaps` nulo; 93 s y 7 577 tokens de
+salida. Leídos a mano los 7 pasajes: 6 sustentan su claim y 1 se estira. La de Peralta García atribuye
+«para Echeverría» una aclaración entre paréntesis del propio Peralta, cuyo pasaje solo dice «podemos
+sospechar que esto lo sabía Echeverría», y mezcla las «propiedades» de la maquinaria con la definición.
+**La prosa añade:** `answer` dice «configuración cualitativa», y «cualitativa» no está en ninguna claim
+ni en los pasajes leídos. El código valida los `chunk_id` de `evidence`, no el texto de `answer` ni la
+fidelidad de cada claim.
+**Consecuencia para 05:** el Verificador debe juzgar la prosa contra los pasajes. `answer` no es
+evidencia: el Redactor debería construir desde `evidence`.
+
+---
+
 ## B · Deuda técnica aceptada
 
 ### B1 · `tests/expertos/` sin `__init__.py` obliga a nombres de test únicos
@@ -607,6 +624,13 @@ la bibliografía (fase 05).
 - **C8 · Sub-consultas que derivan a un subtema marginal no se filtran** (N7). En C3 una
   derivó a «ethos corporativo»: N8 decidirá leyendo si aporta. Hallazgos de la corrida
   real en A14–A16.
+- **C9 · Sin evidencia válida se tira la prosa del LLM** (N12). `answer_question` devuelve una
+  respuesta fija con `confidence="low"` aunque el LLM dijera `high`, y si se descarta una claim rehace
+  `answer` con las supervivientes (D5, X3). Es una regla estructural, no un umbral numérico (regla 7).
+  `gaps` en blanco pasa a `None`; sin evidencia, `gaps` siempre tiene contenido.
+- **C10 · Cada consulta se guarda en un archivo propio que nunca se pisa** (N12), en `data/consult/`.
+  `llm_calls` no conserva la respuesta ni los pasajes, y repetir la pregunta no garantiza la misma
+  salida. `draft` conserva la prosa cruda aunque C9 la haya sustituido.
 
 ## D · Verificaciones pospuestas
 
@@ -721,6 +745,6 @@ la bibliografía (fase 05).
 | N9 | Corrida completa de síntesis | ✅ 2026-10-07 · 9/9 síntesis en `data/synthesis/` (128 claims: 121 supports, 7 contradicts, 0 mentions; 1 descartada; 12 marcas de `PRIMARY_WORKS`) · criterio 2: 203/203 `get_chunk` ✓ · CLI reanudable con `--force` (`pending_drafts`) · 362 tests (+10 slow) · stance todo `supports` en C3, C5, C7 (→N10) · hallazgos A21–A22, cierra D2 |
 | N10 | Muestreo de 10 claims | ✅ 2026-10-17 · `expertos/sampling.py` + CLI `sample` · muestra estratificada (3 `contradicts`, 3 `mencion`, 4 `corriente`; A23) en `data/synthesis/_review/N10-muestra.md` · 10/10 `ok`: criterio 3 = 100 % ponderada (cruda 100 %) ✓, acierto de stance 100 % · 378 tests (+10 slow) · hallazgos A23–A24 (matiza A19), E6 |
 | N11 | SynthesisMap | ✅ 2026-11-04 · `expertos/synthesis_map.py` + CLI `map build` · `data/synthesis_map.json` (9 entradas, 154 papers) · criterio 5: ~1 453 tokens reales de 4 000 ✓ (A25) · 391 tests (+10 slow, no corridos) · E7 |
-| N12 | Modo consulta | ⬜ |
+| N12 | Modo consulta | ✅ 2026-11-04 · `expertos/consult.py` + CLI `ask` · auditoría en `data/consult/` (C10) · sin sub-consultas hasta medir en N13 · 418 tests (+10 slow, no corridos) · A26, C9 |
 | N13 | Preguntas trampa | ⬜ |
 | N14 | Cierre de fase | ⬜ |
