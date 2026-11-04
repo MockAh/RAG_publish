@@ -551,6 +551,17 @@ recuperación, no de reajustar el prompt.
 
 ---
 
+### A25 · El mapa cumple el criterio 5 con margen; el conteo offline es pesimista a propósito
+
+`data/synthesis_map.json` (N11): 9 entradas, 154 papers, 5 515 bytes. Estimación offline
+(`bytes / 2.5`): 2 206 tokens. Contraste real con `deepseek-flash` (`llm_calls` 99 y 100): 1 569
+tokens de entrada con el mapa menos 116 de la llamada base con un `ok` por mensaje ≈ 1 453 tokens,
+36 % del tope de 4 000, unos 3,8 bytes por token. Solo se midió con DeepSeek: el proveedor del
+Orquestador no está decidido, por eso el código usa una estimación con holgura y no un tokenizador
+concreto. Se cuenta el archivo tal como se guarda (`indent=2`).
+
+---
+
 ## B · Deuda técnica aceptada
 
 ### B1 · `tests/expertos/` sin `__init__.py` obliga a nombres de test únicos
@@ -667,6 +678,10 @@ la bibliografía (fase 05).
   (b) el Verificador trata el par como unidad: la atribución se comprueba contra los chunks de
   ambos miembros, y la discusión, solo contra los del `contradicts`.
   Detectado en el muestreo de N10.
+- **E7 (→05):** C4 no lleva `coherent`, así que el Orquestador no ve que C1 y C8 se etiquetaron
+  `coherent=false` (A13) y puede rutear a ellos como a cualquier otro. El `one_liner` de C1 tampoco
+  distingue su parte teórica de sus notas institucionales. No se añade el campo (C4 es contrato);
+  decidir en fase 05 si hace falta, con preguntas de ruteo reales.
 
 ## F · Higiene de proceso
 
@@ -705,7 +720,7 @@ la bibliografía (fase 05).
 | N8 | Síntesis 2/2: claims validadas | ✅ 2026-10-03 · `draft_claims` + CLI `synthesis draft` · `PRIMARY_WORKS` (4 papers) · stance por pares de tesis, validado en C3 (#27, #29, #38 → contradicts) · síntesis con `deepseek-v4-pro`, `max_tokens=32768` · 359 tests (+10 slow) · test slow OK · hallazgos A17 (censo), A18–A20 |
 | N9 | Corrida completa de síntesis | ✅ 2026-10-07 · 9/9 síntesis en `data/synthesis/` (128 claims: 121 supports, 7 contradicts, 0 mentions; 1 descartada; 12 marcas de `PRIMARY_WORKS`) · criterio 2: 203/203 `get_chunk` ✓ · CLI reanudable con `--force` (`pending_drafts`) · 362 tests (+10 slow) · stance todo `supports` en C3, C5, C7 (→N10) · hallazgos A21–A22, cierra D2 |
 | N10 | Muestreo de 10 claims | ✅ 2026-10-17 · `expertos/sampling.py` + CLI `sample` · muestra estratificada (3 `contradicts`, 3 `mencion`, 4 `corriente`; A23) en `data/synthesis/_review/N10-muestra.md` · 10/10 `ok`: criterio 3 = 100 % ponderada (cruda 100 %) ✓, acierto de stance 100 % · 378 tests (+10 slow) · hallazgos A23–A24 (matiza A19), E6 |
-| N11 | SynthesisMap | ⬜ |
+| N11 | SynthesisMap | ✅ 2026-11-04 · `expertos/synthesis_map.py` + CLI `map build` · `data/synthesis_map.json` (9 entradas, 154 papers) · criterio 5: ~1 453 tokens reales de 4 000 ✓ (A25) · 391 tests (+10 slow, no corridos) · E7 |
 | N12 | Modo consulta | ⬜ |
 | N13 | Preguntas trampa | ⬜ |
 | N14 | Cierre de fase | ⬜ |

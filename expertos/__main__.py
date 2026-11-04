@@ -11,6 +11,7 @@ Uso:
     python -m expertos synthesis draft [--expert-id C8] [--force] [--run-id ...] [--out-dir ...]
     python -m expertos sample --n 10 [--seed 42] [--contradicts 3] [--mention-ids C6#11,C5#11,C2#11] [--out ...] [--force]
     python -m expertos sample --report [--out ...]
+    python -m expertos map build [--run-id ...]
 """
 
 from __future__ import annotations
@@ -37,7 +38,7 @@ from expertos.config import Settings
 from expertos.inspection import dump_clusters
 from expertos.labeling import label_all_clusters, label_cluster, load_labels, update_labels
 from expertos.llm import LLMOutputError, make_client
-from expertos.persistence import load_all_syntheses
+from expertos.persistence import load_all_syntheses, save_synthesis_map
 from expertos.sampling import (
     DEFAULT_CONTRADICTS_QUOTA,
     dump_for_review,
@@ -58,6 +59,7 @@ from expertos.synthesis import (
     run_expert_draft,
     run_expert_retrieval,
 )
+from expertos.synthesis_map import MAP_TOKEN_LIMIT, SynthesisMapError, build_synthesis_map, count_map_tokens
 from expertos.vectors import (
     build_representative_vectors,
     get_indexed_paper_ids,
@@ -73,6 +75,8 @@ cluster_app = typer.Typer()
 app.add_typer(cluster_app, name="cluster")
 synthesis_app = typer.Typer()
 app.add_typer(synthesis_app, name="synthesis")
+map_app = typer.Typer()
+app.add_typer(map_app, name="map")
 
 _NOISY_LOGGERS = (
     "httpx",
@@ -454,6 +458,32 @@ def sample(
         typer.echo(f"    {c.expert_id}: {c.n_top}/{c.n_claims} = {c.share:.0%} · {c.top_title[:70]} ({c.top_paper_id})")
     typer.echo(f"{len(sampled)} claims → {out}")
 
+
+
+@map_app.command("build")
+def map_build(
+    run_id: str | None = typer.Option(None, "--run-id", help="Por defecto, `cluster_run_id` de Settings."),
+) -> None:
+    """Arma el Mapa de Síntesis (C4) sin LLM y lo guarda si cumple el criterio 5."""
+    settings = Settings()
+    run_id = run_id or settings.cluster_run_id
+    _check_run_id_matches_vectors(run_id, settings)
+    try:
+        synthesis_map = build_synthesis_map(
+            run_id,
+            load_all_syntheses(synthesis_dir=settings.synthesis_dir),
+            load_labels(settings.cluster_labels_path, run_id),
+            load_corpus_assignment(settings.db_path, run_id),
+        )
+    except SynthesisMapError as exc:
+        typer.echo(f"Mapa no generado: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    path = save_synthesis_map(synthesis_map, path=settings.synthesis_map_path)
+    for entry in synthesis_map.entries:
+        typer.echo(f"{entry.expert_id}  {entry.n_papers:>3} papers  {entry.topic_label}")
+    n_papers = sum(entry.n_papers for entry in synthesis_map.entries)
+    typer.echo(f"{len(synthesis_map.entries)} Expertos, {n_papers} papers → {path}")
+    typer.echo(f"Criterio 5: ~{count_map_tokens(synthesis_map)} tokens estimados (tope {MAP_TOKEN_LIMIT})")
 
 if __name__ == "__main__":
     app()
