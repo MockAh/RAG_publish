@@ -11,7 +11,7 @@ Orquestador/Redactor/Verificador (05).
 
 ## Estado actual
 
-Fase 04, micro-tarea N12 firmada, N13 pendiente. N0–N12 firmadas. 155 papers únicos en
+Fase 04, micro-tarea N13 firmada, N14 pendiente. N0–N13 firmadas. 155 papers únicos en
 data/expert_vectors.npz (3 DOI-variante colapsados, ver A5/A6/E3 del registro). k=9
 elegido por inspección humana (A7/A8); asignación en la tabla `clusters` de
 data/excavador.db, run_id `kmeans-k9-seed42-98b2c308` (sufijo = SHA-256[:8] de
@@ -50,6 +50,12 @@ consulta (`top_k=16`), sin sub-consultas por decisión del usuario: se agregan s
 faltan pasajes que sí están en el corpus. Auditoría en `data/consult/`. A26: la prosa de `answer` y la
 fidelidad de cada claim no las valida el código (→05). Cita textual por verificar con código: se decide
 con los resultados de N13.
+N13: `expertos/traps.py` + CLI `traps run|report`; 63 preguntas (7 por Experto: 2 fáciles, 3 difíciles,
+2 control). Criterio 4 ✓ (juicio del usuario sobre A28): trampas 45/45 en `low`, ninguna atribuye tesis
+a un autor ausente; controles 18/18 responden. `DEFAULT_TOP_K = 32` (47/58 chunks de referencia frente a
+41/58), sin sub-consultas; `gaps` se refiere a los pasajes leídos (A27, A28). Corrida vigente en
+`data/consult_traps/`, la de `top_k=16` en `data/consult_traps_k16/` (fuera de git). `confidence` solo
+separa trampa de control; fidelidad de controles y cita textual sin medir (→05).
 Repo: `~/WandaVision/RAG_publish`, rama `main` (ver plan para N0–N14).
 
 Paquetes previos, YA FIRMADOS, no modificar sin causa documentada (precedente en el
@@ -119,19 +125,7 @@ Toda llamada, éxito o fallo, se registra en la tabla SQLite `llm_calls`
 (`data/excavador.db`), con `provider` y `context` (JSON: para qué era la llamada).
 Diagnóstico tras un fallo: leer `llm_calls.error`, nunca relanzar (F5).
 
-## Tarea en curso: N12 — Modo consulta (`ExpertAnswer`, C5)
+## Tarea en curso: N14 — cierre de fase (sin empezar)
 
-Objetivo (fila N12 del plan): un Experto responde una pregunta online con prosa breve citada,
-`confidence` juzgada por el LLM y `gaps`. Hecho cuando: test con store dummy en verde.
-
-- `expertos/consult.py`: `answer_question` recupera por la pregunta dentro de la partición del
-  Experto (`retrieve_for_expert`), una sola llamada LLM, y valida con `validate_claims` (X3).
-- El prompt no muestra scores (L1) y avisa de que recuperar no es responder (L2). `confidence`
-  no se deriva de ningún número.
-- Sin evidencia válida no hay prosa sin citar: respuesta fija, `confidence="low"` y `gaps`
-  obligatorio. Si se descarta alguna claim, la prosa se rehace con las claims supervivientes.
-- Cada consulta se guarda entera en `data/consult/` (`save_consult`): respuesta, salida cruda del
-  LLM, pasajes leídos y descartes. `llm_calls` no conserva ese texto.
-- CLI: `python -m expertos ask --expert-id C6 "pregunta"`. Modelo: el de síntesis (A20).
-
-**No firmar hasta que el usuario lo vea.**
+Pendiente de definir al iniciar la sesión, según la fila N14 de `04-PLAN-MICROTAREAS-EXPERTOS.md`.
+Reescribir esta sección al empezar y dentro del commit de N14.

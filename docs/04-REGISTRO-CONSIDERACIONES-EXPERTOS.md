@@ -579,6 +579,61 @@ evidencia: el Redactor debería construir desde `evidence`.
 
 ---
 
+### A27 · Primera corrida de N13: las trampas no cuelan, pero la búsqueda deja pasajes fuera
+
+**Descubierto en:** N13, 2026-11-04, `top_k=16`, `deepseek-v4-pro`: 64 llamadas de `consult.answer`
+(63 de N13 y 1 prueba de N12), 393 534 tokens de entrada, 107 121 de salida, media 23 s, máximo 114 s.
+**Trampas (45):** todas `low`. Fáciles 18/18 sin evidencia. Difíciles 24/27 sin evidencia y 3 con
+evidencia, leídas a mano: las tres declaran que el corpus no lo cubre. Fallo menor: los `gaps` de
+C5-dificil2 traen «teatralidad» y «estetización», ajenas a lo citado. Los `gaps` de las otras 42 no se
+leyeron.
+**Controles (18):** ninguno se niega, 17 `high` y 1 `medium`. Recuperan 41/58 chunks de referencia.
+Sondeo solo de recuperación (18 llamadas, `N13.subquery-probe`; guion fuera de git en
+`data/synthesis/_review/N13-sondeo-recuperacion.py`):
+
+| Búsqueda | Referencia | Pasajes (media) | Papers (media) |
+|---|---|---|---|
+| pregunta, `top_k=16` | 41/58 | 15,6 | 5,8 |
+| pregunta, `top_k=32` | 47/58 | 29,8 | 8,4 |
+| pregunta + 4–6 sub-consultas, 8 c/u | 42/58 | 22,1 | 8,6 |
+| pregunta + 4–6 sub-consultas, 16 c/u | 49/58 | 36,3 | 11,3 |
+
+Muestra pequeña, y la referencia son los chunks citados en N9, no un conjunto ideal.
+**Problemas:** (1) `gaps` confunde «no lo leí» con «el corpus no lo cubre» (C4-control2: dice que se
+limita a ciertas críticas sin haber recuperado a Parra Ayala ni a Sabugal). (2) `confidence` casi no
+discrimina: `low` en trampas, `high` en controles, también con `gaps` declarados. (3) C1-control2 perdió
+3 claims con ids a los que parece faltarles la sección (X3 actuó y se rehízo la prosa).
+**Recomendación pendiente de decisión del usuario:** `top_k=32` sin sub-consultas, `gaps` referido a los
+pasajes leídos, repetir las 63 preguntas. La fidelidad de las respuestas de control no está medida.
+
+### A28 · Segunda corrida de N13: `top_k=32` y `gaps` referido a los pasajes leídos
+
+**Descubierto en:** N13, 2026-11-05. Decisión del usuario sobre A27: `DEFAULT_TOP_K = 32`, sin
+sub-consultas; el prompt pide que `gaps` hable de los pasajes leídos y no de todo el corpus (también
+`NO_EVIDENCE_GAPS`). Primera corrida conservada en `data/consult_traps_k16/` y
+`data/synthesis/_review/N13-trampas-k16.md` (fuera de git).
+**Coste:** 63 llamadas, 0 fallos, 680 063 tokens de entrada (1,7× la primera corrida), 125 014 de
+salida, media 18 s, máximo 71 s, 23 min en total.
+
+| | `top_k=16` | `top_k=32` |
+|---|---|---|
+| Fáciles sin evidencia | 18/18 | 18/18 |
+| Difíciles sin evidencia / con evidencia | 24 / 3 | 22 / 5 |
+| Controles que responden (`high`/`medium`) | 18 (17/1) | 18 (17/1) |
+| Chunks de referencia recuperados | 41/58 | 47/58 |
+| Claims descartadas por X3 | 3 (C1-control2) | 0 |
+| `gaps` que hablan de «corpus» | 40/63 | 0/63 |
+
+Las 5 difíciles con evidencia (C1-dificil3, C2-dificil3, C3-dificil2, C6-dificil2, C8-dificil2) se leyeron a
+mano: todas dicen que los pasajes no responden a la pregunta. Las claims citan solo lo
+tangencial que sí está, y el término trampa aparece únicamente negado («no menciona a Adorno»). Ninguna
+atribuye una tesis al autor ausente. C5-dificil2 pasó a cero evidencia. Los `gaps` de los 7 controles
+que los declaran se refieren a lo que no precisan los pasajes. `confidence` sigue sin
+discriminar más allá de trampa/control (problema 2 de A27, sin cambios).
+**Sin medir:** fidelidad de las respuestas de control (→ Verificador, 05) y cita textual.
+
+---
+
 ## B · Deuda técnica aceptada
 
 ### B1 · `tests/expertos/` sin `__init__.py` obliga a nombres de test únicos
@@ -746,5 +801,5 @@ la bibliografía (fase 05).
 | N10 | Muestreo de 10 claims | ✅ 2026-10-17 · `expertos/sampling.py` + CLI `sample` · muestra estratificada (3 `contradicts`, 3 `mencion`, 4 `corriente`; A23) en `data/synthesis/_review/N10-muestra.md` · 10/10 `ok`: criterio 3 = 100 % ponderada (cruda 100 %) ✓, acierto de stance 100 % · 378 tests (+10 slow) · hallazgos A23–A24 (matiza A19), E6 |
 | N11 | SynthesisMap | ✅ 2026-11-04 · `expertos/synthesis_map.py` + CLI `map build` · `data/synthesis_map.json` (9 entradas, 154 papers) · criterio 5: ~1 453 tokens reales de 4 000 ✓ (A25) · 391 tests (+10 slow, no corridos) · E7 |
 | N12 | Modo consulta | ✅ 2026-11-04 · `expertos/consult.py` + CLI `ask` · auditoría en `data/consult/` (C10) · sin sub-consultas hasta medir en N13 · 418 tests (+10 slow, no corridos) · A26, C9 |
-| N13 | Preguntas trampa | ⬜ |
+| N13 | Preguntas trampa | ✅ 2026-11-05 · `expertos/traps.py` + CLI `traps run\|report` · 63 preguntas · criterio 4 ✓ (juicio del usuario) · `DEFAULT_TOP_K = 32` · `gaps` sobre pasajes leídos · 431 tests (+10 slow, no corridos) · A27, A28 |
 | N14 | Cierre de fase | ⬜ |

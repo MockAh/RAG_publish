@@ -13,6 +13,8 @@ Uso:
     python -m expertos sample --report [--out ...]
     python -m expertos map build [--run-id ...]
     python -m expertos ask --expert-id C6 "pregunta" [--top-k 16] [--run-id ...]
+    python -m expertos traps run [--expert-id C6] [--force]
+    python -m expertos traps report
 """
 
 from __future__ import annotations
@@ -62,6 +64,7 @@ from expertos.synthesis import (
     run_expert_retrieval,
 )
 from expertos.synthesis_map import MAP_TOKEN_LIMIT, SynthesisMapError, build_synthesis_map, count_map_tokens
+from expertos.traps import all_questions, evaluate, load_trap_record, report_markdown, save_trap_record
 from expertos.vectors import (
     build_representative_vectors,
     get_indexed_paper_ids,
@@ -79,6 +82,8 @@ synthesis_app = typer.Typer()
 app.add_typer(synthesis_app, name="synthesis")
 map_app = typer.Typer()
 app.add_typer(map_app, name="map")
+traps_app = typer.Typer()
+app.add_typer(traps_app, name="traps")
 
 _NOISY_LOGGERS = (
     "httpx",
@@ -524,6 +529,61 @@ def ask(
     typer.echo(f"{len(result.candidates)} pasajes leídos, {len(result.discarded)} claims descartadas → {path}", err=True)
     for item in result.discarded:
         typer.echo(f"  descartada ({item.reason}): {item.claim.text}", err=True)
+
+
+@traps_app.command("run")
+def traps_run(
+    expert_id: str | None = typer.Option(None, "--expert-id", help="Solo las preguntas de este Experto."),
+    force: bool = typer.Option(False, "--force", help="Repetir también las ya respondidas."),
+) -> None:
+    """Corre las preguntas pendientes (una llamada por pregunta); es reanudable."""
+    _configure_logging()
+    settings = Settings()
+    run_id = settings.cluster_run_id
+    _check_run_id_matches_vectors(run_id, settings)
+    labels = load_labels(settings.cluster_labels_path, run_id)
+    todo = [
+        q
+        for q in all_questions()
+        if (expert_id is None or q.expert_id == expert_id)
+        and (force or load_trap_record(q.trap_id, traps_dir=settings.traps_dir) is None)
+    ]
+    llm_client = make_client("synthesis", settings)
+    chunk_store = ChunkStore(settings.chroma_dir)
+    storage = Storage(settings.db_path)
+    failed = []
+    for q in todo:
+        try:
+            record = answer_question(
+                q.expert_id, q.question, labels[q.expert_id], llm_client, chunk_store,
+                run_id=run_id, db_path=settings.db_path, excavador_storage=storage,
+            )
+        except LLMOutputError as exc:
+            logging.getLogger(__name__).warning("%s sin respuesta válida: %s", q.trap_id, exc)
+            failed.append(q.trap_id)
+            continue
+        save_trap_record(q.trap_id, record, traps_dir=settings.traps_dir)
+        typer.echo(f"{q.trap_id}: {record.answer.confidence}, {len(record.answer.evidence)} claims")
+    typer.echo(f"{len(todo) - len(failed)} preguntas respondidas, {len(failed)} fallidas {failed or ''}")
+    if failed:
+        raise typer.Exit(1)
+
+
+@traps_app.command("report")
+def traps_report() -> None:
+    """Escribe el informe de N13 con lo ya respondido. Sin LLM."""
+    settings = Settings()
+    syntheses = load_all_syntheses(synthesis_dir=settings.synthesis_dir)
+    records = {}
+    outcomes = []
+    for q in all_questions():
+        record = load_trap_record(q.trap_id, traps_dir=settings.traps_dir)
+        if record is not None:
+            records[q.trap_id] = record
+            outcomes.append(evaluate(q, record, syntheses))
+    settings.traps_report_path.parent.mkdir(parents=True, exist_ok=True)
+    settings.traps_report_path.write_text(report_markdown(outcomes, records), encoding="utf-8")
+    typer.echo(f"{len(outcomes)}/{len(all_questions())} preguntas → {settings.traps_report_path}")
 
 if __name__ == "__main__":
     app()

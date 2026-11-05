@@ -49,9 +49,9 @@ from expertos.synthesis import (
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_TOP_K = 16
+DEFAULT_TOP_K = 32  # N13: 47/58 pasajes de referencia frente a 41/58 con 16 (A27)
 NO_EVIDENCE_ANSWER = "Los pasajes de este Experto no sustentan una respuesta a la pregunta."
-NO_EVIDENCE_GAPS = "El corpus de este Experto no cubre lo que se pregunta."
+NO_EVIDENCE_GAPS = "Los pasajes recuperados del corpus de este Experto no responden a lo que se pregunta."
 
 
 class AnswerDraft(BaseModel):
@@ -96,7 +96,7 @@ Respondes a un orquestador usando SOLO los pasajes que se te dan, sin conocimien
 
 Los pasajes se recuperaron por similitud de tema: que aparezcan no significa que respondan.
 Léelos antes de decidir. El orden no indica relevancia. Si la pregunta no se puede responder
-con ellos, dilo: reconocer que tu corpus no lo cubre es una respuesta correcta.
+con ellos, dilo: reconocer que estos pasajes no la responden es una respuesta correcta.
 
 Campos de la respuesta:
 
@@ -117,7 +117,9 @@ Campos de la respuesta:
     high: responden directamente y sin dejar partes importantes fuera.
     medium: responden en parte, o solo de forma indirecta.
     low: apenas tocan la pregunta o no la responden.
-- gaps: qué parte de la pregunta no cubre tu corpus. null solo si no falta nada.
+- gaps: qué parte de la pregunta no responden los pasajes que leíste. Habla solo de esos pasajes,
+  no de todo tu corpus: que un autor o tema no aparezca en ellos no significa que el corpus no lo
+  trate. null solo si no falta nada.
 
 Responde con un objeto JSON con las claves "answer", "evidence" (lista de objetos con "text",
 "supporting_chunks" y "stance"), "confidence" y "gaps"."""
