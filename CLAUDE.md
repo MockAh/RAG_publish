@@ -1,17 +1,19 @@
 # Proyecto: sistema multiagente de investigación con citas verificables
 
 Sistema que responde preguntas de investigación con prosa académica citada y verificada
-contra un corpus. Fases: Excavador (02) → Biblioteca RAG (03) → Expertos (04, EN CURSO) →
-Orquestador/Redactor/Verificador (05).
+contra un corpus. Fases: Excavador (02) → Biblioteca RAG (03) → Expertos (04, CERRADA 2026-11-05) →
+Orquestador/Redactor/Verificador (05, siguiente).
 
 **Leer antes de tocar nada:** `docs/00-VISION-Y-ARQUITECTURA.md`,
 `docs/01-CONTRATOS-DE-DATOS_v11.md` (contratos C1–C7, no romper compatibilidad),
 `docs/03-HERENCIA-PARA-FASES-04-Y-05.md`, `docs/04-PLAN-MICROTAREAS-EXPERTOS.md`,
-`docs/04-REGISTRO-CONSIDERACIONES-EXPERTOS.md`.
+`docs/04-REGISTRO-CONSIDERACIONES-EXPERTOS.md`, `docs/04-SPEC-EXPERTOS-Y-SINTESIS_v11.md`,
+`docs/04-HERENCIA-PARA-FASE-05.md`, `docs/04-PROPAGACION-A-00-Y-01.md`.
 
 ## Estado actual
 
-Fase 04, micro-tarea N13 firmada, N14 pendiente. N0–N13 firmadas. 155 papers únicos en
+**Fase 04 CERRADA (N14, 2026-11-05).** N0–N14 firmadas; spec v1.1 CERRADA, criterios 1–5 ✓.
+Propagación a `00`/`01` pendiente de aplicar a mano (también la de fase 03). Siguiente: spec 05. 155 papers únicos en
 data/expert_vectors.npz (3 DOI-variante colapsados, ver A5/A6/E3 del registro). k=9
 elegido por inspección humana (A7/A8); asignación en la tabla `clusters` de
 data/excavador.db, run_id `kmeans-k9-seed42-98b2c308` (sufijo = SHA-256[:8] de
@@ -125,7 +127,15 @@ Toda llamada, éxito o fallo, se registra en la tabla SQLite `llm_calls`
 (`data/excavador.db`), con `provider` y `context` (JSON: para qué era la llamada).
 Diagnóstico tras un fallo: leer `llm_calls.error`, nunca relanzar (F5).
 
-## Tarea en curso: N14 — cierre de fase (sin empezar)
+## Tarea en curso: N14 — cierre de fase
 
-Pendiente de definir al iniciar la sesión, según la fila N14 de `04-PLAN-MICROTAREAS-EXPERTOS.md`.
-Reescribir esta sección al empezar y dentro del commit de N14.
+Hecho cuando la spec 04 queda marcada CERRADA (fila N14 del plan). Precedente: M18 de fase 03
+(commit `1aac611`). Entregables:
+1. `docs/04-SPEC-EXPERTOS-Y-SINTESIS_v11.md`: spec v1 del usuario + cabecera CERRADA, resultados,
+   criterios 1–5 con su evidencia y respuesta a las preguntas abiertas (Q1, Q2, X3, N8, N12).
+2. Registro: estado CERRADA, D3 ✅ (N10), fila N14.
+3. `docs/04-PROPAGACION-A-00-Y-01.md`: D10, D11, contenedor `SynthesisMap`, parámetros globales.
+   Se aplica a mano, como en fase 03; no se editan `00`/`01` en esta tarea.
+4. `docs/04-HERENCIA-PARA-FASE-05.md`: E1–E7 y lo que el Orquestador/Redactor/Verificador debe saber.
+5. Checklist: suite rápida en `.venv` + los slow sin LLM. Los 4 slow con LLM real no se corren:
+   gastan saldo y el de etiquetado reescribe `cluster_labels_slowtest.json`.

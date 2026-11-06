@@ -2,7 +2,9 @@
 
 > Compañero del plan de micro-tareas (`04-PLAN-MICROTAREAS-EXPERTOS.md`).
 > Recoge hallazgos, deuda aceptada y herencias entre micro-tareas.
-> Estado: **fase en curso** · N0–N6 firmadas.
+> Estado: **FASE 04 CERRADA (2026-11-05)** · N0–N14 firmadas. Este registro pasa a ser referencia
+> histórica y herencia para la fase 05 (resumen en `04-HERENCIA-PARA-FASE-05.md`).
+> Resultado final: 9 Expertos sobre 154 papers, 128 claims, mapa de ~1 453 tokens, 431 tests.
 
 ---
 
@@ -650,6 +652,18 @@ colisiona en la importación. Se resolvió renombrando a `test_expertos_config.p
 **Cómo se maneja:** aplicar `html.unescape` al mostrar títulos en el etiquetado (N5) y en
 la bibliografía (fase 05).
 
+### B3 · Regeneración selectiva tras ingesta (Q1) decidida, no implementada
+**Origen:** N14 (revisión de cierre). Q1 fija re-clusterizar desde cero y regenerar solo las
+síntesis de clústeres con Jaccard < 0.8. Ninguna micro-tarea lo implementó porque en la fase no
+hubo ingesta nueva: no existe el cálculo de Jaccard ni la correspondencia entre `expert_id` de
+dos runs.
+**Por qué se acepta:** una regeneración completa cuesta 0,26 USD y 908 s (A22); la optimización
+no compensa hoy.
+**Cómo se maneja:** tras una ingesta, secuencia manual `vectors` → `cluster` → `synthesis retrieve`
+→ `synthesis draft` → `map build`, con inspección humana del nuevo k (A8). El `run_id` cambia, así
+que los `expert_id` no son estables entre runs.
+**Gatillo:** el coste de regenerar se vuelve relevante, o la fase 05 necesita `expert_id` estables.
+
 ## C · Comportamientos deliberados que parecen bugs
 
 - **C1 · `ExpertAnswer.gaps` es obligatorio aunque admita `None`** (N6). El contrato C5
@@ -692,7 +706,7 @@ la bibliografía (fase 05).
 - **D1 (→N4) ✅ resuelta en N4 (A8: k=9).** Elección de k. El silhouette será bajo por el carácter monotemático del
   corpus; manda la inspección humana de 3 clústeres, no la métrica.
 - **D2 (→N9) ✅ resuelta en N9 (A22: 0,26 USD, 268 955 tokens, 908 s).** Coste real de una regeneración completa. Se lee de `llm_calls`, no se estima.
-- **D3 (→N10):** tasa de claims realmente sustentadas, con los fallos clasificados en
+- **D3 (→N10) ✅ resuelta en N10 (A23: 10/10 `ok`, 100 % ponderada, ningún fallo que clasificar).** Tasa de claims realmente sustentadas, con los fallos clasificados en
   *claim infiel* frente a *chunk roto* (E6 de fase 03).
 
 ## E · Cuestiones que tocan otras fases
@@ -802,4 +816,4 @@ la bibliografía (fase 05).
 | N11 | SynthesisMap | ✅ 2026-11-04 · `expertos/synthesis_map.py` + CLI `map build` · `data/synthesis_map.json` (9 entradas, 154 papers) · criterio 5: ~1 453 tokens reales de 4 000 ✓ (A25) · 391 tests (+10 slow, no corridos) · E7 |
 | N12 | Modo consulta | ✅ 2026-11-04 · `expertos/consult.py` + CLI `ask` · auditoría en `data/consult/` (C10) · sin sub-consultas hasta medir en N13 · 418 tests (+10 slow, no corridos) · A26, C9 |
 | N13 | Preguntas trampa | ✅ 2026-11-05 · `expertos/traps.py` + CLI `traps run\|report` · 63 preguntas · criterio 4 ✓ (juicio del usuario) · `DEFAULT_TOP_K = 32` · `gaps` sobre pasajes leídos · 431 tests (+10 slow, no corridos) · A27, A28 |
-| N14 | Cierre de fase | ⬜ |
+| N14 | Cierre de fase | ✅ 2026-11-05 · spec `04-SPEC-EXPERTOS-Y-SINTESIS_v11.md` CERRADA (criterios 1–5 ✓) · `04-PROPAGACION-A-00-Y-01.md` (D10–D12, contenedor `SynthesisMap`, parámetros) · `04-HERENCIA-PARA-FASE-05.md` · 431 tests en verde; slow: 5 sin LLM en verde (vectores, clustering, chunker, embedder, relevancia), GROBID omitido (servicio apagado), 4 con LLM real no corridos (gastan saldo; el de etiquetado reescribe `cluster_labels_slowtest.json`) · D3 cerrada, B3 |
