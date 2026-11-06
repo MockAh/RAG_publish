@@ -13,7 +13,8 @@ Orquestador/Redactor/Verificador (05, siguiente).
 ## Estado actual
 
 **Fase 04 CERRADA (N14, 2026-11-05).** N0–N14 firmadas; spec v1.1 CERRADA, criterios 1–5 ✓.
-Propagación a `00`/`01` pendiente de aplicar a mano (también la de fase 03). Siguiente: spec 05. 155 papers únicos en
+Propagaciones de fases 03 y 04 aplicadas (2026-11-06): `01` v1.3 (archivo sigue `_v11.md`), `00` v1.2.
+Siguiente: spec 05 (no está en el repo todavía). 155 papers únicos en
 data/expert_vectors.npz (3 DOI-variante colapsados, ver A5/A6/E3 del registro). k=9
 elegido por inspección humana (A7/A8); asignación en la tabla `clusters` de
 data/excavador.db, run_id `kmeans-k9-seed42-98b2c308` (sufijo = SHA-256[:8] de

@@ -5,6 +5,7 @@
 > transcribieron literalmente en `expertos/models.py` (N6).
 > Si la propagación de fase 03 (`03-PROPAGACION-A-00-Y-01.md`, `01` → v1.2) todavía no se ha
 > aplicado, aplicarla primero: esta lleva `01` a v1.3.
+> **✅ Aplicado el 2026-11-06**, después de la de fase 03: `01` v1.3, `00` v1.2.
 
 ---
 

@@ -2,6 +2,7 @@
 
 > Aplicar estos cambios a mano en los documentos maestros. Son pocos y aditivos:
 > **ningún contrato existente se rompe**.
+> **✅ Aplicado el 2026-11-06** (junto con la propagación de fase 04): `01` v1.3, `00` v1.2.
 
 ---
 
