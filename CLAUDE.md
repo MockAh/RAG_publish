@@ -2,19 +2,22 @@
 
 Sistema que responde preguntas de investigación con prosa académica citada y verificada
 contra un corpus. Fases: Excavador (02) → Biblioteca RAG (03) → Expertos (04, CERRADA 2026-11-05) →
-Orquestador/Redactor/Verificador (05, siguiente).
+Orquestador/Redactor/Verificador (05, EN CURSO).
 
 **Leer antes de tocar nada:** `docs/00-VISION-Y-ARQUITECTURA.md`,
 `docs/01-CONTRATOS-DE-DATOS_v11.md` (contratos C1–C7, no romper compatibilidad),
 `docs/03-HERENCIA-PARA-FASES-04-Y-05.md`, `docs/04-PLAN-MICROTAREAS-EXPERTOS.md`,
 `docs/04-REGISTRO-CONSIDERACIONES-EXPERTOS.md`, `docs/04-SPEC-EXPERTOS-Y-SINTESIS_v11.md`,
 `docs/04-HERENCIA-PARA-FASE-05.md`, `docs/04-PROPAGACION-A-00-Y-01.md`.
+Fase 05: `docs/05-SPEC-ORQUESTADOR-REDACTOR-VERIFICADOR.md`, `docs/05-PLAN-MICROTAREAS-CONSULTA.md`, `docs/05-REGISTRO-CONSIDERACIONES-CONSULTA.md`.
 
 ## Estado actual
 
 **Fase 04 CERRADA (N14, 2026-11-05).** N0–N14 firmadas; spec v1.1 CERRADA, criterios 1–5 ✓.
 Propagaciones de fases 03 y 04 aplicadas (2026-11-06): `01` v1.3 (archivo sigue `_v11.md`), `00` v1.2.
-Siguiente: spec 05 (no está en el repo todavía). 155 papers únicos en
+**Fase 05 en curso:** spec v1 en el repo (2026-11-06); **R0 firmada (2026-11-07)**: decisiones Y1–Y14
+cerradas (plan v1, sección A; resumen al final de la spec 05). Siguiente: R1 (bootstrap `redaccion/`).
+Lo que sigue de esta sección es el estado final de la fase 04. 155 papers únicos en
 data/expert_vectors.npz (3 DOI-variante colapsados, ver A5/A6/E3 del registro). k=9
 elegido por inspección humana (A7/A8); asignación en la tabla `clusters` de
 data/excavador.db, run_id `kmeans-k9-seed42-98b2c308` (sufijo = SHA-256[:8] de
@@ -128,15 +131,9 @@ Toda llamada, éxito o fallo, se registra en la tabla SQLite `llm_calls`
 (`data/excavador.db`), con `provider` y `context` (JSON: para qué era la llamada).
 Diagnóstico tras un fallo: leer `llm_calls.error`, nunca relanzar (F5).
 
-## Tarea en curso: N14 — cierre de fase
+## Tarea en curso: ninguna (R0 firmada; R1 sin iniciar)
 
-Hecho cuando la spec 04 queda marcada CERRADA (fila N14 del plan). Precedente: M18 de fase 03
-(commit `1aac611`). Entregables:
-1. `docs/04-SPEC-EXPERTOS-Y-SINTESIS_v11.md`: spec v1 del usuario + cabecera CERRADA, resultados,
-   criterios 1–5 con su evidencia y respuesta a las preguntas abiertas (Q1, Q2, X3, N8, N12).
-2. Registro: estado CERRADA, D3 ✅ (N10), fila N14.
-3. `docs/04-PROPAGACION-A-00-Y-01.md`: D10, D11, contenedor `SynthesisMap`, parámetros globales.
-   Se aplica a mano, como en fase 03; no se editan `00`/`01` en esta tarea.
-4. `docs/04-HERENCIA-PARA-FASE-05.md`: E1–E7 y lo que el Orquestador/Redactor/Verificador debe saber.
-5. Checklist: suite rápida en `.venv` + los slow sin LLM. Los 4 slow con LLM real no se corren:
-   gastan saldo y el de etiquetado reescribe `cluster_labels_slowtest.json`.
+Al iniciar R1, reescribir esta sección según su fila en `05-PLAN-MICROTAREAS-CONSULTA.md`
+(bootstrap `redaccion/`: Settings `REDACCION_` con `extra="ignore"`, modelos C6/C7 literales +
+registro por pieza de Y7, persistencia atómica). Vocabulario de trabajo con el usuario: glosario
+de la panadería, sección E del plan.
