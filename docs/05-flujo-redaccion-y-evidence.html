@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flujo de Redacción · Fase 05</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=STIX+Two+Text:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1b1b1b;
+    --ink-soft:#5a5a5a;
+    --paper:#ffffff;
+    --desk:#e9e8e4;
+    --rule:#c9c7c1;
+    --accent:#b31b1b;
+    --ds:#0b4f9e;          /* DeepSeek: Orquestador, Expertos, Redactor */
+    --gm:#9a6400;          /* Gemini: Verificador (otra empresa, D11) */
+    --code:#2f6b3a;        /* código, sin LLM */
+    --code-bg:#f1f7f1;
+    --stop:#b31b1b;        /* el sistema se detiene y lo declara */
+    --stop-bg:#fbf1f1;
+    --note-bg:#faf7f2;
+    --serif:"STIX Two Text", Georgia, "Times New Roman", serif;
+    --mono:"IBM Plex Mono", "SF Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ink:#e6e4df; --ink-soft:#a9a6a0; --paper:#1d1d1f; --desk:#121213; --rule:#45433f;
+      --accent:#e26a6a; --ds:#7fb0f0; --gm:#e0b45c; --code:#86c493; --code-bg:#1a261c;
+      --stop:#e88080; --stop-bg:#2b1b1b; --note-bg:#262421;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ink:#e6e4df; --ink-soft:#a9a6a0; --paper:#1d1d1f; --desk:#121213; --rule:#45433f;
+    --accent:#e26a6a; --ds:#7fb0f0; --gm:#e0b45c; --code:#86c493; --code-bg:#1a261c;
+    --stop:#e88080; --stop-bg:#2b1b1b; --note-bg:#262421;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--desk);font-family:var(--serif);color:var(--ink);padding:32px 16px 64px;line-height:1.55}
+  .sheet{max-width:960px;margin:0 auto;background:var(--paper);border-top:5px solid var(--accent);
+    box-shadow:0 1px 3px rgba(0,0,0,.12),0 12px 32px rgba(0,0,0,.10);padding:40px 48px 56px}
+  .masthead{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between;align-items:baseline;font-family:var(--mono);
+    font-size:11px;letter-spacing:.06em;color:var(--ink-soft);border-bottom:1px solid var(--rule);padding-bottom:10px;margin-bottom:34px}
+  .masthead .id{color:var(--accent)}
+  h1{font-size:27px;font-weight:700;line-height:1.25;text-align:center;max-width:680px;margin:0 auto 10px}
+  .subtitle{text-align:center;font-style:italic;color:var(--ink-soft);font-size:15.5px;margin-bottom:30px}
+  .abstract{max-width:680px;margin:0 auto 40px;font-size:14px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:14px 4px}
+  .abstract b{font-variant:small-caps;letter-spacing:.04em;font-weight:600}
+  section{margin-top:44px}
+  h2{font-size:15px;font-variant:small-caps;letter-spacing:.05em;font-weight:700;margin-bottom:12px}
+  h2 .num{color:var(--accent);font-variant:normal;font-family:var(--mono);font-size:12px;margin-right:8px}
+  p.lead{font-size:14px;margin-bottom:14px;max-width:760px}
+  code{font-family:var(--mono);font-size:.86em}
+  figure{margin:0 0 8px}
+  .fig-frame{border:1px solid var(--rule);padding:18px 10px 10px;overflow-x:auto}
+  svg{display:block;width:100%;height:auto;min-width:680px}
+  figcaption{font-size:13px;max-width:760px;margin:14px auto 0;text-align:justify}
+  figcaption .figno{font-weight:700}
+
+  /* — SVG — */
+  .b{fill:var(--paper);stroke:var(--ink);stroke-width:1.2}
+  .b-code{fill:var(--code-bg);stroke:var(--code);stroke-width:1.3;stroke-dasharray:6 3}
+  .b-stop{fill:var(--stop-bg);stroke:var(--stop);stroke-width:1.3}
+  .b-note{fill:var(--note-bg);stroke:var(--rule);stroke-width:1}
+  .b-out{fill:var(--paper);stroke:var(--ink);stroke-width:2.2}
+  .bar-ds{fill:var(--ds)} .bar-gm{fill:var(--gm)}
+  .dia{fill:var(--paper);stroke:var(--ink-soft);stroke-width:1.2}
+  .ar{fill:none;stroke:var(--ink-soft);stroke-width:1.3}
+  .ar-loop{fill:none;stroke:var(--ds);stroke-width:1.4;stroke-dasharray:5 3}
+  .ar-dot{fill:none;stroke:var(--rule);stroke-width:1.2;stroke-dasharray:2 3}
+  .ahp{fill:var(--ink-soft)} .ahp-ds{fill:var(--ds)}
+  .t{font-family:var(--serif);font-size:12.5px;fill:var(--ink);text-anchor:middle}
+  .tl{font-family:var(--serif);font-size:12.5px;fill:var(--ink)}
+  .tt{font-family:var(--serif);font-size:13.5px;font-weight:700;fill:var(--ink);text-anchor:middle}
+  .ttl{font-family:var(--serif);font-size:13.5px;font-weight:700;fill:var(--ink)}
+  .mut{fill:var(--ink-soft);font-style:italic}
+  .lab{font-family:var(--mono);font-size:11px;fill:var(--ink-soft)}
+  .lane{font-family:var(--mono);font-size:11px;letter-spacing:.08em;fill:var(--accent)}
+  .k-ds{fill:var(--ds);font-weight:700} .k-gm{fill:var(--gm);font-weight:700} .k-code{fill:var(--code);font-weight:700} .k-stop{fill:var(--stop);font-weight:700}
+
+  /* — modelos — */
+  .models{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:18px}
+  .card{border:1px solid var(--rule);padding:12px 14px;font-size:13px;background:var(--paper)}
+  .card h3{font-family:var(--mono);font-size:12px;font-weight:500;margin-bottom:6px}
+  .card .tag{font-family:var(--mono);font-size:10px;letter-spacing:.06em;padding:1px 6px;border:1px solid currentColor;margin-left:6px}
+  .card .tag.c{color:var(--accent)} .card .tag.i{color:var(--code)}
+  .card pre{font-family:var(--mono);font-size:11.5px;line-height:1.5;white-space:pre-wrap;color:var(--ink);margin:6px 0}
+  .card p{color:var(--ink-soft);font-size:12.5px}
+
+  /* — tablas — */
+  .tbl-wrap{overflow-x:auto;margin-top:10px}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{text-align:left;vertical-align:top;padding:7px 10px;border-bottom:1px solid var(--rule)}
+  th{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;font-weight:500;color:var(--ink-soft);border-bottom:1.5px solid var(--ink)}
+  td.id{font-family:var(--mono);font-size:12px;color:var(--accent);white-space:nowrap}
+  td.where{font-family:var(--mono);font-size:11.5px;white-space:nowrap}
+  .done{color:var(--code);font-weight:500}
+  .delta{margin-top:20px;background:var(--note-bg);border:1px solid var(--rule);border-left:3px solid var(--code);padding:14px 18px;font-size:13.5px}
+  .delta ul{margin-left:18px} .delta li{margin-bottom:6px}
+  footer{margin-top:44px;padding-top:12px;border-top:1px solid var(--rule);font-family:var(--mono);font-size:10.5px;
+    color:var(--ink-soft);display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between}
+  @media (max-width:640px){
+    .sheet{padding:24px 16px 40px}
+    h1{font-size:22px}
+  }
+</style>
+</head>
+<body>
+<main class="sheet">
+
+<div class="masthead">
+  <span class="id">FASE 05 · CONSULTA · redaccion/</span>
+  <span>Estado: R0 firmada · R1 hecha, pendiente de firma · 2026-11-08</span>
+</div>
+
+<h1>Cómo se redacta y se verifica una sección, y de dónde sale su evidencia</h1>
+<p class="subtitle">Diagramas de flujo de <code>redaccion/</code> y de <code>evidence</code>, con las decisiones Y1–Y14 de R0 y las de R1</p>
+
+<div class="abstract">
+  <b>Resumen.</b> Un pedido pasa por el Orquestador, de uno a cuatro Expertos, el Redactor y el
+  Verificador, con un máximo de tres ciclos de corrección. El Verificador es de otra empresa (Gemini),
+  y el código, no el prompt, garantiza lo que un LLM solo podría prometer: que ninguna cita apunte a un
+  chunk ajeno (Y5), que las oraciones se corten siempre igual (Y6) y que toda pieza lleve veredicto
+  explícito (Y7). La figura 1 sigue un pedido completo. La figura 2 sigue a <code>evidence</code> desde
+  el retrieval del Experto hasta el juicio del Verificador. La figura 3 muestra cómo el registro de R1
+  clasifica cada pieza. Las figuras 1 y 2 describen el diseño; de <code>redaccion/</code> solo existe
+  lo construido en R1.
+</div>
+
+<!-- ============================ FIGURA 1 ============================ -->
+<section>
+<h2><span class="num">§1</span>Flujo de un pedido</h2>
+<figure>
+<div class="fig-frame">
+<svg viewBox="0 0 880 940" role="img" aria-label="Diagrama de flujo de un pedido: Orquestador, Expertos, Redactor, código de validación, Verificador, bucle de hasta tres ciclos y salida">
+  <defs>
+    <marker id="ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahp" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="ah1ds" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahp-ds" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+
+  <!-- Leyenda -->
+  <rect class="b-note" x="20" y="86" width="240" height="206"/>
+  <text class="ttl" x="34" y="108">Leyenda</text>
+  <rect class="bar-ds" x="34" y="120" width="5" height="14"/><text class="tl" x="48" y="132">LLM DeepSeek</text>
+  <rect class="bar-gm" x="34" y="142" width="5" height="14"/><text class="tl" x="48" y="154">LLM Gemini (otra empresa, D11)</text>
+  <rect class="b-code" x="34" y="164" width="14" height="14"/><text class="tl" x="56" y="176">código, sin LLM</text>
+  <rect class="b-stop" x="34" y="186" width="14" height="14"/><text class="tl" x="56" y="198">se detiene y lo declara</text>
+  <text class="lab" x="34" y="226">Y11 · topes por pedido:</text>
+  <text class="lab" x="34" y="242">Orquestador 1 · Expertos ≤ 4</text>
+  <text class="lab" x="34" y="258">Redactor ≤ 3</text>
+  <text class="lab" x="34" y="274">Verificador: en piezas</text>
+
+  <!-- Usuario -->
+  <rect class="b" x="320" y="16" width="240" height="40"/>
+  <text class="t" x="440" y="41">Pregunta o encargo del usuario</text>
+  <path class="ar" d="M440,56 V86" marker-end="url(#ah1)"/>
+
+  <!-- Orquestador -->
+  <rect class="b" x="290" y="86" width="300" height="62"/><rect class="bar-ds" x="290" y="86" width="5" height="62"/>
+  <text class="tt" x="440" y="107">Orquestador</text>
+  <text class="t" x="440" y="124">lee el SynthesisMap completo (C4)</text>
+  <text class="t" x="440" y="140">descompone y asigna 1–4 Expertos</text>
+  <path class="ar" d="M440,148 V168" marker-end="url(#ah1)"/>
+
+  <!-- D1 -->
+  <polygon class="dia" points="440,168 545,200 440,232 335,200"/>
+  <text class="t" x="440" y="204">¿el mapa lo cubre?</text>
+  <path class="ar" d="M545,200 H638" marker-end="url(#ah1)"/>
+  <text class="lab" x="578" y="193">no</text>
+  <rect class="b-stop" x="640" y="172" width="225" height="58"/>
+  <text class="tt" x="752" y="191">Nivel 1 · Y10</text>
+  <text class="t" x="752" y="207">declara «fuera de corpus»,</text>
+  <text class="t" x="752" y="222">sugiere ingesta; 0 Expertos</text>
+  <path class="ar" d="M440,232 V262" marker-end="url(#ah1)"/>
+  <text class="lab" x="448" y="251">sí</text>
+
+  <!-- Expertos -->
+  <rect class="b" x="260" y="262" width="360" height="72"/><rect class="bar-ds" x="260" y="262" width="5" height="72"/>
+  <text class="tt" x="440" y="283">Expertos (≤ 4, en paralelo)</text>
+  <text class="t" x="440" y="301">answer_question · top_k = 32 (fase 04)</text>
+  <text class="t" x="440" y="318">→ ExpertAnswer (C5) · detalle en la figura 2</text>
+  <path class="ar" d="M440,334 V350" marker-end="url(#ah1)"/>
+
+  <!-- D2 -->
+  <polygon class="dia" points="440,350 552,382 440,414 328,382"/>
+  <text class="t" x="440" y="386">¿alguno trae evidencia?</text>
+  <path class="ar" d="M552,382 H638" marker-end="url(#ah1)"/>
+  <text class="lab" x="582" y="375">no</text>
+  <rect class="b-stop" x="640" y="352" width="225" height="60"/>
+  <text class="tt" x="752" y="371">Nivel 2 · Y10</text>
+  <text class="t" x="752" y="387">todos low sin evidencia: lista</text>
+  <text class="t" x="752" y="403">los gaps; no llama al Redactor</text>
+  <rect class="b-note" x="20" y="356" width="290" height="52"/>
+  <text class="tl" x="32" y="377">Caso intermedio (Y10): se redacta con los</text>
+  <text class="tl" x="32" y="395">que aportan; los gaps del resto se avisan.</text>
+  <path class="ar-dot" d="M310,382 H328"/>
+  <path class="ar" d="M440,414 V442" marker-end="url(#ah1)"/>
+  <text class="lab" x="448" y="432">sí</text>
+
+  <!-- Redactor -->
+  <rect class="b" x="270" y="442" width="340" height="72"/><rect class="bar-ds" x="270" y="442" width="5" height="72"/>
+  <text class="tt" x="440" y="463">Redactor</text>
+  <text class="t" x="440" y="481">entrada (Y4): claims + texto de chunks + gaps</text>
+  <text class="t" x="440" y="498">salida: DraftSection (C6) con [n] y ⟨sin fuente⟩</text>
+  <path class="ar" d="M440,514 V542" marker-end="url(#ah1)"/>
+
+  <!-- Código -->
+  <rect class="b-code" x="270" y="542" width="340" height="72"/>
+  <text class="tt" x="440" y="563">Código, sin LLM</text>
+  <text class="t" x="440" y="581">Y5: cita a chunk ajeno → se retira, ⟨sin fuente⟩</text>
+  <text class="t" x="440" y="598">Y6: segmenta en piezas con índice estable</text>
+  <path class="ar" d="M440,614 V642" marker-end="url(#ah1)"/>
+
+  <!-- Verificador -->
+  <rect class="b" x="270" y="642" width="340" height="80"/><rect class="bar-gm" x="270" y="642" width="5" height="80"/>
+  <text class="tt" x="440" y="663">Verificador</text>
+  <text class="t" x="440" y="681">bandeja (Y3): charola completa o pieza por pieza</text>
+  <text class="t" x="440" y="698">ok · not_entailed · scope_mismatch</text>
+  <text class="t mut" x="440" y="714">chunk_not_found lo pone el código</text>
+  <path class="ar" d="M610,682 H648" marker-end="url(#ah1)"/>
+  <rect class="b-code" x="650" y="646" width="215" height="72"/>
+  <text class="tt" x="757" y="667">Libro de inspección (Y7)</text>
+  <text class="t" x="757" y="685">PieceLog: un veredicto por</text>
+  <text class="t" x="757" y="702">chunk, «ok» incluido · R1</text>
+  <path class="ar" d="M440,722 V750" marker-end="url(#ah1)"/>
+
+  <!-- D3 -->
+  <polygon class="dia" points="440,750 522,780 440,810 358,780"/>
+  <text class="t" x="440" y="778">¿passed?</text>
+  <text class="lab" x="440" y="794" text-anchor="middle">C7</text>
+  <path class="ar" d="M440,810 V852" marker-end="url(#ah1)"/>
+  <text class="lab" x="448" y="836">sí</text>
+  <path class="ar" d="M358,780 H202" marker-end="url(#ah1)"/>
+  <text class="lab" x="272" y="772">no: failures</text>
+
+  <!-- D4 -->
+  <polygon class="dia" points="130,748 200,780 130,812 60,780"/>
+  <text class="t" x="130" y="777">¿quedan</text>
+  <text class="t" x="130" y="792">ciclos?</text>
+  <path class="ar-loop" d="M130,748 V478 H268" marker-end="url(#ah1ds)"/>
+  <text class="lab" x="140" y="598">sí: ciclos 2–3,</text>
+  <text class="lab" x="140" y="613">solo lo corregido</text>
+  <text class="lab" x="140" y="628">(Y3, Y6)</text>
+  <path class="ar" d="M130,812 V887 H268" marker-end="url(#ah1)"/>
+  <text class="lab" x="140" y="840">no, o tope Y11:</text>
+  <text class="lab" x="140" y="855">⟨sin verificar⟩</text>
+
+  <!-- Salida -->
+  <rect class="b-out" x="270" y="852" width="340" height="72"/>
+  <text class="tt" x="440" y="873">Salida al usuario</text>
+  <text class="t" x="440" y="891">texto + bibliografía «APA reducido» (Y12)</text>
+  <text class="t" x="440" y="908">«profundiza en [n]»: chunk citado, sin LLM (Y13)</text>
+</svg>
+</div>
+<figcaption><span class="figno">Figura 1.</span> Un pedido de principio a fin. El sistema se detiene antes
+de redactar en dos puntos (Y10): cuando el mapa no tiene Experto para la pregunta y cuando ningún Experto
+trae evidencia válida. Entre el Redactor y el Verificador, el código retira las citas ajenas y corta las
+oraciones, así que el Verificador recibe piezas con índice estable y puede re-verificar solo las que
+cambiaron. Una pieza que sigue fallando tras tres ciclos, o un pedido que supera un tope de Y11, sale
+marcado ⟨sin verificar⟩; lo ya verificado se entrega igual.</figcaption>
+</figure>
+</section>
+
+<!-- ============================ FIGURA 2 ============================ -->
+<section>
+<h2><span class="num">§2</span>La vida de <code>evidence</code></h2>
+<p class="lead"><code>evidence</code> es la lista de <code>Claim</code> de una <code>ExpertAnswer</code> (C5): cada
+afirmación atómica con los <code>chunk_id</code> que la sostienen y su <code>stance</code>. Es lo único de la
+respuesta del Experto que el Redactor convierte en prosa citada; la prosa de <code>answer</code> se queda fuera.</p>
+<figure>
+<div class="fig-frame">
+<svg viewBox="0 0 880 600" role="img" aria-label="Diagrama de flujo de evidence: retrieval, LLM, validación de claims en fase 04 y su uso por el Redactor y el Verificador en fase 05">
+  <defs>
+    <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahp" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+  <text class="lane" x="20" y="18">FASE 04 · DENTRO DEL EXPERTO (expertos/consult.py)</text>
+  <text class="lane" x="460" y="18">FASE 05 · LO QUE HACE redaccion/</text>
+
+  <!-- izquierda -->
+  <rect class="b" x="20" y="34" width="400" height="40"/>
+  <text class="t" x="220" y="58">Partición del Experto en Chroma (de los 154 papers)</text>
+  <path class="ar" d="M220,74 V94" marker-end="url(#ah2)"/>
+
+  <rect class="b-code" x="20" y="94" width="400" height="56"/>
+  <text class="t" x="220" y="116">retrieve: la pregunta tal cual, prefijo «query: »</text>
+  <text class="t" x="220" y="134">top_k = 32 candidatos · empareja por tema, no por postura (L2)</text>
+  <path class="ar" d="M220,150 V170" marker-end="url(#ah2)"/>
+
+  <rect class="b" x="20" y="170" width="400" height="56"/><rect class="bar-ds" x="20" y="170" width="5" height="56"/>
+  <text class="t" x="220" y="192">deepseek-v4-pro · 1 llamada → AnswerDraft</text>
+  <text class="t" x="220" y="210">answer · evidence · confidence · gaps</text>
+  <path class="ar" d="M220,226 V246" marker-end="url(#ah2)"/>
+
+  <rect class="b-code" x="20" y="246" width="400" height="56"/>
+  <text class="t" x="220" y="268">validate_claims (X3): claim con chunk_id fuera</text>
+  <text class="t" x="220" y="286">de los candidatos → se descarta, no se repara</text>
+  <path class="ar" d="M220,302 V322" marker-end="url(#ah2)"/>
+
+  <polygon class="dia" points="220,322 330,352 220,382 110,352"/>
+  <text class="t" x="220" y="356">¿sobrevive alguna claim?</text>
+  <path class="ar" d="M110,352 H80 V418" marker-end="url(#ah2)"/>
+  <text class="lab" x="86" y="345">no</text>
+  <path class="ar" d="M330,352 H360 V418" marker-end="url(#ah2)"/>
+  <text class="lab" x="340" y="345">sí</text>
+
+  <rect class="b-stop" x="20" y="420" width="190" height="86"/>
+  <text class="tt" x="115" y="440">Respuesta fija</text>
+  <text class="t" x="115" y="457">confidence = low</text>
+  <text class="t" x="115" y="473">gaps con contenido (C9)</text>
+  <text class="t mut" x="115" y="494">todos así → nivel 2 de Y10</text>
+
+  <rect class="b-out" x="230" y="420" width="190" height="86"/>
+  <text class="tt" x="325" y="440">ExpertAnswer (C5)</text>
+  <text class="t" x="325" y="457">si hubo descartes, la</text>
+  <text class="t" x="325" y="473">prosa de answer se cambia</text>
+  <text class="t" x="325" y="489">por las claims que quedan</text>
+
+  <rect class="b-note" x="20" y="530" width="400" height="52"/>
+  <text class="t" x="220" y="551">Todo queda en ConsultRecord (data/consult/): pasajes</text>
+  <text class="t" x="220" y="569">leídos, borrador crudo del LLM y claims descartadas.</text>
+
+  <!-- puente -->
+  <path class="ar" d="M420,463 H440 V82 H458" marker-end="url(#ah2)"/>
+  <text class="lab" x="455" y="300" transform="rotate(-90 455 300)" text-anchor="middle">C5 → Redactor</text>
+
+  <!-- derecha -->
+  <rect class="b" x="460" y="34" width="400" height="98"/>
+  <text class="tt" x="660" y="55">Qué usa el Redactor de la respuesta (Y4)</text>
+  <text class="tl" x="476" y="78"><tspan class="k-code">evidence → sí:</tspan> claims con sus chunk_ids</text>
+  <text class="tl" x="476" y="97"><tspan class="k-code">gaps → sí:</tspan> permiten declarar huecos</text>
+  <text class="tl" x="476" y="116"><tspan class="k-stop">answer → no:</tspan> solo auditoría (A26: nadie la valida)</text>
+  <path class="ar" d="M660,132 V150" marker-end="url(#ah2)"/>
+
+  <rect class="b-code" x="460" y="150" width="400" height="56"/>
+  <text class="t" x="660" y="172">get_chunk(chunk_id) por cada claim</text>
+  <text class="t" x="660" y="190">→ texto completo del chunk + marca from_abstract</text>
+  <path class="ar" d="M660,206 V226" marker-end="url(#ah2)"/>
+
+  <rect class="b" x="460" y="226" width="400" height="56"/><rect class="bar-ds" x="460" y="226" width="5" height="56"/>
+  <text class="t" x="660" y="248">El Redactor escribe solo con ese material</text>
+  <text class="t" x="660" y="266">cada pieza factual cierra con [n]; si no, ⟨sin fuente⟩</text>
+  <path class="ar" d="M660,282 V302" marker-end="url(#ah2)"/>
+
+  <rect class="b" x="460" y="302" width="400" height="72"/><rect class="bar-ds" x="460" y="302" width="5" height="72"/>
+  <text class="tt" x="660" y="322">Pares E6 (Y9)</text>
+  <text class="t" x="660" y="340">atribución → chunk supports · objeción → contradicts</text>
+  <text class="t" x="660" y="358">contradicts sin gemelo (5 de 7): atribución ⟨sin fuente⟩</text>
+  <path class="ar" d="M660,374 V394" marker-end="url(#ah2)"/>
+
+  <rect class="b-code" x="460" y="394" width="400" height="72"/>
+  <text class="tt" x="660" y="414">Y5 · validación de citas por código</text>
+  <text class="t" x="660" y="432">chunk_id de citations que no está en evidence → se retira;</text>
+  <text class="t" x="660" y="450">la pieza queda ⟨sin fuente⟩ y la retirada se registra</text>
+  <path class="ar" d="M660,466 V486" marker-end="url(#ah2)"/>
+
+  <rect class="b" x="460" y="486" width="400" height="56"/><rect class="bar-gm" x="460" y="486" width="5" height="56"/>
+  <text class="t" x="660" y="508">Verificador: cada par (pieza, chunk) contra el texto</text>
+  <text class="t" x="660" y="526">literal del chunk → veredicto en el libro (Y7)</text>
+</svg>
+</div>
+<figcaption><span class="figno">Figura 2.</span> La misma regla de fase 04 se repite en fase 05: el código
+descarta, no repara. En el Experto, una claim con un <code>chunk_id</code> que no estaba entre los pasajes
+leídos se descarta (X3); en el Redactor, una cita a un chunk que no está en <code>evidence</code> se retira
+(Y5). El Redactor nunca ve la prosa de <code>answer</code>, porque nadie la verifica (A26); trabaja con las
+claims y el texto literal de cada chunk, así que el Verificador juzga contra lo mismo que leyó el Redactor.</figcaption>
+</figure>
+</section>
+
+<!-- ============================ FIGURA 3 ============================ -->
+<section>
+<h2><span class="num">§3</span>Lo que construyó R1: el libro de inspección</h2>
+<p class="lead">C7 solo lista fallos; el criterio 1 (≥ 90 % de oraciones factuales verificadas) necesita también
+los aciertos. Cada pieza de cada ciclo queda en un <code>PieceRecord</code> con un <code>status</code>, y el
+modelo rechaza cualquier combinación incoherente.</p>
+<figure>
+<div class="fig-frame">
+<svg viewBox="0 0 880 320" role="img" aria-label="Árbol de decisión del status de una pieza: exempt, unsupported, unverified, verified o failed">
+  <defs>
+    <marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahp" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+  <rect class="b" x="14" y="140" width="120" height="50"/>
+  <text class="tt" x="74" y="161">Pieza</text>
+  <text class="lab" x="74" y="178" text-anchor="middle">index estable (Y6)</text>
+  <path class="ar" d="M134,165 H158" marker-end="url(#ah3)"/>
+
+  <polygon class="dia" points="230,131 300,165 230,199 160,165"/>
+  <text class="t" x="230" y="169">¿kind?</text>
+  <path class="ar" d="M230,131 V68 H298" marker-end="url(#ah3)"/>
+  <text class="lab" x="238" y="100">transition / meta</text>
+  <rect class="b-note" x="300" y="22" width="180" height="56"/>
+  <text class="tt" x="390" y="44">exempt</text>
+  <text class="t" x="390" y="62">exenta (Y8) · sin veredictos</text>
+  <path class="ar" d="M300,165 H348" marker-end="url(#ah3)"/>
+  <text class="lab" x="306" y="157">factual</text>
+
+  <polygon class="dia" points="420,131 490,165 420,199 350,165"/>
+  <text class="t" x="420" y="169">¿cita?</text>
+  <path class="ar" d="M420,199 V248" marker-end="url(#ah3)"/>
+  <text class="lab" x="428" y="226">no</text>
+  <rect class="b-stop" x="330" y="250" width="180" height="56"/>
+  <text class="tt" x="420" y="272">unsupported</text>
+  <text class="t" x="420" y="290">⟨sin fuente⟩ · es fallo</text>
+  <path class="ar" d="M490,165 H533" marker-end="url(#ah3)"/>
+  <text class="lab" x="496" y="157">sí</text>
+
+  <polygon class="dia" points="612,127 690,165 612,203 535,165"/>
+  <text class="t" x="612" y="161">¿veredicto por</text>
+  <text class="t" x="612" y="176">cada chunk?</text>
+  <path class="ar" d="M612,203 V248" marker-end="url(#ah3)"/>
+  <text class="lab" x="620" y="226">no (corte Y11)</text>
+  <rect class="b-stop" x="522" y="250" width="180" height="56"/>
+  <text class="tt" x="612" y="272">unverified</text>
+  <text class="t" x="612" y="290">⟨sin verificar⟩</text>
+  <path class="ar" d="M690,165 H743" marker-end="url(#ah3)"/>
+  <text class="lab" x="696" y="157">sí</text>
+
+  <polygon class="dia" points="800,135 857,165 800,195 745,165"/>
+  <text class="t" x="800" y="169">¿todos ok?</text>
+  <path class="ar" d="M800,135 V80" marker-end="url(#ah3)"/>
+  <text class="lab" x="808" y="112">sí</text>
+  <rect class="b-out" x="730" y="22" width="140" height="56"/>
+  <text class="tt" x="800" y="44">verified</text>
+  <text class="t" x="800" y="62">cuenta como acierto</text>
+  <path class="ar" d="M800,195 V248" marker-end="url(#ah3)"/>
+  <text class="lab" x="808" y="226">no</text>
+  <rect class="b" x="730" y="250" width="140" height="56"/>
+  <text class="tt" x="800" y="272">failed</text>
+  <text class="t" x="800" y="290">vuelve al Redactor</text>
+</svg>
+</div>
+<figcaption><span class="figno">Figura 3.</span> Cómo <code>PieceRecord</code> clasifica una pieza. El modelo
+no calcula el <code>status</code>: lo guarda para que la auditoría se lea sin recalcular, y lo rechaza si no
+concuerda con <code>kind</code>, <code>chunk_ids</code> y <code>verdicts</code>. Así, una pieza citada que se
+declara <code>verified</code> o <code>failed</code> sin un veredicto por cada chunk da <code>ValidationError</code>
+(Y7: una pieza sin veredicto es un error, no un acierto), y una pieza factual no se puede declarar
+<code>exempt</code> (la trampa del denominador de Y8). Una pieza que agota los tres ciclos sale
+<code>unverified</code> aunque tenga veredictos.</figcaption>
+</figure>
+
+<div class="models">
+  <div class="card">
+    <h3>DraftSection<span class="tag c">C6 · literal</span></h3>
+<pre>text: str
+citations: dict[int, list[str]]
+unsupported_marked: bool</pre>
+    <p>Sin validadores: la coherencia entre <code>[n]</code> y <code>citations</code> la revisa y registra el
+    código en R5–R6. Las claves <code>[n]</code> vuelven del JSON como enteros.</p>
+  </div>
+  <div class="card">
+    <h3>VerificationReport · CitationFailure<span class="tag c">C7 · literal</span></h3>
+<pre>passed: bool
+failures: list[CitationFailure]
+  sentence · chunk_id · reason</pre>
+    <p>Rechaza <code>passed=True</code> con fallos. Admite <code>passed=False</code> sin fallos: una pieza
+    ⟨sin fuente⟩ no tiene <code>chunk_id</code> que reportar.</p>
+  </div>
+  <div class="card">
+    <h3>PieceLog · PieceRecord · ChunkVerdict<span class="tag i">interno · Y7</span></h3>
+<pre>consultation_id · pieces[]
+  index · cycle · text · kind
+  pair_role · chunk_ids · verdicts[] · status
+    chunk_id · verdict · reason</pre>
+    <p>Un veredicto por chunk, no por pieza: el Verificador juzga pares (oración, chunk). Cada
+    <code>(index, cycle)</code> es único.</p>
+  </div>
+</div>
+</section>
+
+<!-- ============================ DECISIONES ============================ -->
+<section>
+<h2><span class="num">§4</span>Decisiones de R0 (2026-11-07) y dónde actúan</h2>
+<div class="tbl-wrap">
+<table>
+  <thead><tr><th>#</th><th>DECISIÓN</th><th>ACTÚA EN</th></tr></thead>
+  <tbody>
+    <tr><td class="id">Y1</td><td>Paquete <code>redaccion/</code> (prefijo <code>REDACCION_</code>, <code>extra="ignore"</code>); reutiliza <code>expertos.llm</code> y <code>answer_question</code>. Produce secciones verificadas, no el artículo ensamblado</td><td class="where"><span class="done">R1 ✓</span></td></tr>
+    <tr><td class="id">Y2</td><td>Verificador con Gemini; Orquestador y Redactor con DeepSeek (D11). 3.6-flash frente a 3.8-flash con llamadas reales</td><td class="where">R2</td></tr>
+    <tr><td class="id">Y3</td><td>Tamaño de bandeja parametrizable: charola completa al arrancar, 1 = pieza por pieza. Ciclos 2–3 re-verifican solo lo que cambió</td><td class="where"><span class="done">R1 ✓</span> parámetro · R7 · R11–R12 deciden</td></tr>
+    <tr><td class="id">Y4</td><td>El Redactor recibe solo claims + texto completo de cada chunk (<code>from_abstract</code> visible) + <code>gaps</code>; la prosa de <code>answer</code> no entra</td><td class="where">R5</td></tr>
+    <tr><td class="id">Y5</td><td>Toda cita a un <code>chunk_id</code> fuera de <code>evidence</code> se retira → ⟨sin fuente⟩, y la retirada se registra</td><td class="where">R5</td></tr>
+    <tr><td class="id">Y6</td><td>Segmentación y emparejado por código, con índice estable; <code>[n]</code> al final de la oración; catálogo de abreviaturas en tres capas</td><td class="where">R6 · R13 (capa c)</td></tr>
+    <tr><td class="id">Y7</td><td>Registro por pieza aparte de C7, con veredicto explícito para todas, <code>ok</code> incluido</td><td class="where"><span class="done">R1 ✓</span> modelo · R7–R8 lo llenan</td></tr>
+    <tr><td class="id">Y8</td><td>Toda pieza es factual salvo transición o meta-texto; pieza sin cita ni marca = fallo; alarma si las exentas pasan de ~20 %</td><td class="where"><span class="done">R1 ✓</span> <code>kind</code>, umbral · R5 · R13</td></tr>
+    <tr><td class="id">Y9</td><td>Pares E6: atribución y objeción en piezas separadas; un chunk <code>contradicts</code> solo sostiene la objeción</td><td class="where"><span class="done">R1 ✓</span> <code>pair_role</code> · R5</td></tr>
+    <tr><td class="id">Y10</td><td>Fuera de corpus en dos niveles + caso intermedio</td><td class="where">R3 · R4 · R14</td></tr>
+    <tr><td class="id">Y11</td><td>Topes: Orquestador 1, Expertos ≤ 4, Redactor ≤ 3; Verificador en piezas; corte con ⟨sin verificar⟩; <code>consultation_id</code> en <code>llm_calls</code></td><td class="where"><span class="done">R1 ✓</span> topes · R8 · R10</td></tr>
+    <tr><td class="id">Y12</td><td>Bibliografía numerada «APA reducido» con aviso de datos faltantes; sin exportación en v1</td><td class="where">R9</td></tr>
+    <tr><td class="id">Y13</td><td>«Profundiza en [n]» muestra el chunk citado (texto, paper, sección, veredicto), vecinos opcionales, sin LLM</td><td class="where">R9</td></tr>
+    <tr><td class="id">Y14</td><td><code>coherent</code> no entra a C4 en v1; R4 mide el ruteo hacia C1, C7 y C8</td><td class="where">R4</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="delta">
+  <h2><span class="num">§5</span>Decisiones tomadas en R1 (pendientes de tu firma)</h2>
+  <ul>
+    <li><b>Settings sin secretos obligatorios.</b> Proveedor y modelo del Verificador llegan en R2. Se
+      rechaza <code>MAX_CYCLES &gt; MAX_WRITER_CALLS</code>, porque cada ciclo es una llamada al Redactor.</li>
+    <li><b>Veredicto por chunk, no por pieza.</b> Una pieza con <code>[n]</code> de dos chunks tiene dos veredictos.</li>
+    <li><b><code>status</code> guardado y validado</b> contra <code>kind</code>, <code>chunk_ids</code> y
+      <code>verdicts</code> (figura 3). <code>unverified</code> admite veredictos parciales o ninguno.</li>
+    <li><b>C7 admite <code>passed=False</code> sin fallos</b> (registro, C1); <b>C6 sin validadores</b> (C2).</li>
+    <li><b>Auditoría de solo añadir:</b> <code>save_record</code> no pisa un archivo salvo que se pida con
+      <code>overwrite=True</code>; un subdirectorio por <code>consultation_id</code> en <code>data/redaccion/</code>.</li>
+  </ul>
+</div>
+</section>
+
+<footer>
+  <span>docs/05-flujo-redaccion-y-evidence.html</span>
+  <span>Fuentes: spec 05 · plan 05 (secc. A–B) · registro 05 · 01 v1.3 · expertos/consult.py · redaccion/</span>
+</footer>
+
+</main>
+</body>
+</html>

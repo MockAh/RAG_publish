@@ -30,7 +30,14 @@
 
 ## C · Comportamientos deliberados que parecen bugs
 
-*(vacío)*
+- **C1 · `VerificationReport(passed=False, failures=[])` es válido (R1).** C7 solo admite fallos
+  con `chunk_id`; una pieza ⟨sin fuente⟩ (Y8) no tiene, pero cuenta como fallo. El validador solo
+  rechaza `passed=True` con fallos. El detalle por pieza vive en el registro de Y7 (`PieceLog`).
+- **C2 · `DraftSection` sin validadores (R1).** Un `[n]` sin entrada en `citations`, o al revés,
+  no rechaza el borrador: lo detecta y registra el código del Redactor (Y5, Y6) en R5–R6.
+- **C3 · `PieceRecord.status="unverified"` admite veredictos parciales o ninguno (R1).** Es el
+  corte por presupuesto (Y11) o el agotamiento de ciclos. Los estados `verified`/`failed` sí
+  exigen un veredicto por cada `chunk_id` citado (Y7).
 
 ## D · Verificaciones pospuestas
 
@@ -55,4 +62,4 @@ y `llm_calls.error` antes de relanzar algo que gasta cuota).
 | # | Tarea | Estado |
 |---|---|---|
 | R0 | Decisiones Y1–Y14 | ✅ 2026-11-07 |
-| R1 | Bootstrap `redaccion/` | ⬜ |
+| R1 | Bootstrap `redaccion/` | 🟡 hecha 2026-11-09, firma pendiente |
