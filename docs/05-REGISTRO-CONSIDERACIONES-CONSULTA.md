@@ -2,7 +2,7 @@
 
 > Compañero del plan de micro-tareas (`05-PLAN-MICROTAREAS-CONSULTA.md`).
 > Recoge hallazgos, deuda aceptada y herencias entre micro-tareas.
-> Estado: **fase en curso** · R0 firmada (2026-11-07), plan v1.
+> Estado: **fase en curso** · R0 firmada (2026-11-07), R1 firmada (2026-11-15), plan v1.
 
 ---
 
@@ -62,4 +62,4 @@ y `llm_calls.error` antes de relanzar algo que gasta cuota).
 | # | Tarea | Estado |
 |---|---|---|
 | R0 | Decisiones Y1–Y14 | ✅ 2026-11-07 |
-| R1 | Bootstrap `redaccion/` | 🟡 hecha 2026-11-09, firma pendiente |
+| R1 | Bootstrap `redaccion/` | ✅ 2026-11-15 |

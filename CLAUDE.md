@@ -16,9 +16,9 @@ Fase 05: `docs/05-SPEC-ORQUESTADOR-REDACTOR-VERIFICADOR.md`, `docs/05-PLAN-MICRO
 **Fase 04 CERRADA (N14, 2026-11-05).** N0–N14 firmadas; spec v1.1 CERRADA, criterios 1–5 ✓.
 Propagaciones de fases 03 y 04 aplicadas (2026-11-06): `01` v1.3 (archivo sigue `_v11.md`), `00` v1.2.
 **Fase 05 en curso:** spec v1 en el repo (2026-11-06); **R0 firmada (2026-11-07)**: decisiones Y1–Y14
-cerradas (plan v1, sección A; resumen al final de la spec 05). **R1 hecha y en commit (2026-11-09),
-firma pendiente** de la revisión del usuario (`docs/05-flujo-redaccion-y-evidence.html` y las
-decisiones de R1, §5 del HTML). Siguiente tras la firma: R2 (sondeo del proveedor del Verificador).
+cerradas (plan v1, sección A; resumen al final de la spec 05). **R1 firmada (2026-11-15):** `redaccion/`
+con Settings, C6/C7 literales, registro por pieza Y7 y persistencia atómica (notas C1–C3 del registro 05;
+diagrama en `docs/05-flujo-redaccion-y-evidence.html`). Siguiente: R2 (sondeo del proveedor del Verificador).
 Lo que sigue de esta sección es el estado final de la fase 04. 155 papers únicos en
 data/expert_vectors.npz (3 DOI-variante colapsados, ver A5/A6/E3 del registro). k=9
 elegido por inspección humana (A7/A8); asignación en la tabla `clusters` de
@@ -133,23 +133,9 @@ Toda llamada, éxito o fallo, se registra en la tabla SQLite `llm_calls`
 (`data/excavador.db`), con `provider` y `context` (JSON: para qué era la llamada).
 Diagnóstico tras un fallo: leer `llm_calls.error`, nunca relanzar (F5).
 
-## Tarea en curso: R1 — bootstrap `redaccion/` (hecha, en commit; firma pendiente)
+## Tarea en curso: R2 — sondeo del proveedor del Verificador (sin empezar)
 
-Fila de `05-PLAN-MICROTAREAS-CONSULTA.md`: Settings, modelos C6/C7 literales + registro por
-pieza (Y7), persistencia atómica. **Hecho cuando:** test de campos 1:1 con `01` (patrón de N6) +
-round-trip JSON → cumplido (72 tests en `tests/redaccion/`, suite completa 503 ✓; `Settings()`
-probado desde la raíz con el `.env` real).
-
-- `redaccion/config.py`: `Settings` `REDACCION_`, `extra="ignore"`, sin secretos (proveedores en R2).
-  Bandeja Y3 (`None` = charola), topes Y11, 3 ciclos (C7), alarma de exentas 0,20 (Y8),
-  `audit_dir=data/redaccion`; rechaza `max_cycles > max_writer_calls`.
-- `redaccion/models.py`: C6/C7 literales; registro Y7 = `PieceLog` → `PieceRecord` → `ChunkVerdict`
-  (veredicto por chunk; `status` guardado y validado contra `kind`/`chunk_ids`/`verdicts`).
-- `redaccion/persistence.py`: `consultation_dir`, `save_record` (no pisa salvo `overwrite=True`),
-  `load_record`; reutiliza `expertos.persistence._atomic_write_text`.
-- Notas C1–C3 en el registro 05. Diagrama: `docs/05-flujo-redaccion-y-evidence.html`.
-
-**Al retomar:** preguntar al usuario por su revisión del HTML y de las decisiones de R1 (veredicto
-por chunk; `status` validado; `passed=False` sin fallos admitido; auditoría de solo añadir). Si pide
-cambios: commit `R1: ajustes tras revisión`. Con la firma: marcar R1 ✅ en el registro, actualizar
-«Estado actual» y reescribir esta sección para R2.
+Fila de `05-PLAN-MICROTAREAS-CONSULTA.md`: llamadas reales desde la raíz, cuota efectiva (Y2: comparar
+`gemini-3.6-flash` y `gemini-3.8-flash` con los mismos casos). **Hecho cuando:** llamada real OK con
+proveedor ≠ Redactor + fila en `llm_calls`; cuota anotada. Al empezar R2, reescribir esta sección con
+el detalle (va en el commit de R2).
